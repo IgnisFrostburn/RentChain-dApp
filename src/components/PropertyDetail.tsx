@@ -5,355 +5,449 @@ import Link from "next/link";
 import Navbar from "./Navbar";
 import { sendLovelace, waitForTransaction } from "@/utils/transaction";
 import { Button } from "./ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
+import { Card, CardContent } from "./ui/Card";
 import { Badge } from "./ui/Badge";
-import { 
-    ChevronLeft, 
-    MapPin, 
-    ShieldCheck, 
-    Wallet, 
-    Clock, 
-    CheckCircle2, 
-    AlertCircle, 
-    ArrowRight,
-    Info,
-    Building2
+import {
+	ChevronLeft,
+	MapPin,
+	Wallet2,
+	Clock,
+	CheckCircle2,
+	AlertCircle,
+	ArrowRight,
+	Terminal,
+	Cpu,
+	Fingerprint,
+	Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function PropertyDetail({ property }: { property: any }) {
-    const [wallet, setWallet] = useState<MeshCardanoBrowserWallet | null>(null);
-    const [connectedWalletName, setConnectedWalletName] = useState<string | null>(null);
-    const [availableWallets, setAvailableWallets] = useState<string[]>([]);
-    const [showWalletModal, setShowWalletModal] = useState(false);
-    const [isPending, setIsPending] = useState(false);
-    const [isConfirmed, setIsConfirmed] = useState(false);
-    const [txHash, setTxHash] = useState<string | null>(null);
+	const [wallet, setWallet] = useState<MeshCardanoBrowserWallet | null>(null);
+	const [connectedWalletName, setConnectedWalletName] = useState<string | null>(
+		null,
+	);
+	const [availableWallets, setAvailableWallets] = useState<string[]>([]);
+	const [showWalletModal, setShowWalletModal] = useState(false);
+	const [isPending, setIsPending] = useState(false);
+	const [isConfirmed, setIsConfirmed] = useState(false);
+	const [txHash, setTxHash] = useState<string | null>(null);
 
-    useEffect(() => {
-        const rentedProperties = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
-        if (property && rentedProperties.includes(property.id)) {
-            setIsConfirmed(true);
-        }
-    }, [property]);
+	useEffect(() => {
+		const rentedProperties = JSON.parse(
+			localStorage.getItem("rentedProperties") || "[]",
+		);
+		if (property && rentedProperties.includes(property.id)) {
+			setIsConfirmed(true);
+		}
+	}, [property]);
 
-    const handlePayment = async () => {
-        if (!wallet || !property) return;
-        try {
-            setIsPending(true);
-            const hash = await sendLovelace(
-                wallet,
-                property.landlordAddress,
-                (property.depositADA * 1000000).toString()
-            );
-            setTxHash(hash);
-            const confirmed = await waitForTransaction(hash);
-            if (confirmed) {
-                setIsConfirmed(true);
-                const rentedProperties = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
-                if (!rentedProperties.includes(property.id)) {
-                    rentedProperties.push(property.id);
-                    localStorage.setItem("rentedProperties", JSON.stringify(rentedProperties));
-                }
-            } else {
-                alert("Transaction submission timed out. Please check your wallet.");
-            }
-        } catch (error) {
-            console.error("Payment error:", error);
-            alert("Error processing payment. See console for details.");
-        } finally {
-            setIsPending(false);
-        }
-    };
+	const handlePayment = async () => {
+		if (!wallet || !property) return;
+		try {
+			setIsPending(true);
+			const hash = await sendLovelace(
+				wallet,
+				property.landlordAddress,
+				(property.depositADA * 1000000).toString(),
+			);
+			setTxHash(hash);
+			const confirmed = await waitForTransaction(hash);
+			if (confirmed) {
+				setIsConfirmed(true);
+				const rentedProperties = JSON.parse(
+					localStorage.getItem("rentedProperties") || "[]",
+				);
+				if (!rentedProperties.includes(property.id)) {
+					rentedProperties.push(property.id);
+					localStorage.setItem(
+						"rentedProperties",
+						JSON.stringify(rentedProperties),
+					);
+				}
+			} else {
+				alert("Transaction submission timed out. Please check your wallet.");
+			}
+		} catch (error) {
+			console.error("Payment error:", error);
+			alert("Error processing payment. See console for details.");
+		} finally {
+			setIsPending(false);
+		}
+	};
 
-    const connectWallet = async (walletName: string) => {
-        try {
-            if (walletName == "Disconnected") return;
-            const wallet = await MeshCardanoBrowserWallet.enable(walletName);
-            setWallet(wallet);
-            setConnectedWalletName(walletName);
-        } catch (error) {
-            console.error("Error connecting wallet:", error);
-        }
-    }
+	const connectWallet = async (walletName: string) => {
+		try {
+			if (walletName == "Disconnected") return;
+			const wallet = await MeshCardanoBrowserWallet.enable(walletName);
+			setWallet(wallet);
+			setConnectedWalletName(walletName);
+		} catch (error) {
+			console.error("Error connecting wallet:", error);
+		}
+	};
 
-    useEffect(() => {
-        const getAvailableWallets = async () => {
-            try {
-                const wallets = MeshCardanoBrowserWallet.getInstalledWallets();
-                const walletNames = wallets.map((wallet) => wallet.name);
-                setAvailableWallets(walletNames);
-            } catch (error) {
-                console.error("Error fetching available wallets:", error);
-            }
-        };
-        getAvailableWallets();
-    }, []);
+	useEffect(() => {
+		const getAvailableWallets = async () => {
+			try {
+				const wallets = MeshCardanoBrowserWallet.getInstalledWallets();
+				const walletNames = wallets.map((wallet) => wallet.name);
+				setAvailableWallets(walletNames);
+			} catch (error) {
+				console.error("Error fetching available wallets:", error);
+			}
+		};
+		getAvailableWallets();
+	}, []);
 
-    if (!property) {
-        return (
-            <div className="min-h-screen">
-                <Navbar />
-                <main className="max-w-4xl mx-auto px-4 py-24 text-center">
-                    <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h1 className="text-2xl font-bold text-gray-900">Property not found</h1>
-                    <Link href="/listings" className="text-blue-600 hover:underline mt-4 inline-block">
-                        Back to Listings
-                    </Link>
-                </main>
-            </div>
-        );
-    }
+	if (!property) {
+		return (
+			<div className="min-h-screen bg-[#030303] text-white flex items-center justify-center">
+				<div className="text-center space-y-4">
+					<AlertCircle className="w-16 h-16 text-red-500 mx-auto opacity-50" />
+					<h1 className="text-3xl font-black uppercase tracking-tighter">
+						Asset Not Found
+					</h1>
+					<Link href="/listings">
+						<Button className="bg-white text-black font-black px-8">
+							Return to Terminal
+						</Button>
+					</Link>
+				</div>
+			</div>
+		);
+	}
 
-    return (
-        <div className="min-h-screen pb-24">
-            <Navbar />
-            
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <Link href="/listings" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-blue-600 mb-8 transition-colors group">
-                    <ChevronLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" />
-                    Back to all listings
-                </Link>
+	return (
+		<div className="min-h-screen bg-[#030303] text-white crypto-grid pb-24">
+			<Navbar />
 
-                <div className="grid lg:grid-cols-3 gap-12">
-                    {/* Left Column: Details */}
-                    <div className="lg:col-span-2 space-y-12">
-                        <section>
-                            <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <Badge variant={isConfirmed ? "success" : property.status === "Available" ? "success" : "warning"} className="h-7 px-4">
-                                    {isConfirmed ? "Rented by You" : property.status}
-                                </Badge>
-                                <Badge variant="outline" className="h-7 px-4 bg-white/50 border-gray-200">
-                                    <ShieldCheck className="w-3 h-3 mr-1.5 text-blue-500" />
-                                    Verified Listing
-                                </Badge>
-                            </div>
-                            
-                            <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-4 leading-tight">
-                                {property.title}
-                            </h1>
-                            
-                            <div className="flex items-center text-xl text-gray-500 font-medium">
-                                <MapPin className="w-6 h-6 mr-2 text-blue-500" />
-                                {property.location}
-                            </div>
-                        </section>
+			<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+				<Link
+					href="/listings"
+					className="inline-flex items-center text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-400 mb-10 transition-colors group">
+					<ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+					Back to Terminal
+				</Link>
 
-                        <div className="aspect-[16/9] rounded-[2rem] bg-gradient-to-br from-blue-100 to-indigo-100 border border-blue-100/50 relative overflow-hidden group">
-                            <div className="absolute inset-0 flex items-center justify-center text-blue-200 group-hover:scale-110 transition-transform duration-700">
-                                <Building2 className="w-48 h-48 opacity-20" />
-                            </div>
-                            <div className="absolute bottom-8 left-8 right-8 p-8 glass rounded-3xl">
-                                <p className="text-gray-900 font-bold text-xl mb-1">Modern Urban Living</p>
-                                <p className="text-gray-600">Experience the best of {property.location.split(',')[0]} in this premium space.</p>
-                            </div>
-                        </div>
+				<div className="grid lg:grid-cols-12 gap-16">
+					{/* Main Content */}
+					<div className="lg:col-span-8 space-y-16">
+						<section>
+							<div className="flex flex-wrap items-center gap-4 mb-8">
+								<Badge className="bg-blue-600 font-black px-5 py-1 text-[10px] tracking-widest uppercase rounded-full">
+									Asset_ID_{property.id}
+								</Badge>
+								<div className="flex items-center gap-2 text-emerald-400 font-black text-[10px] uppercase tracking-widest">
+									<div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+									Verified on Cardano
+								</div>
+							</div>
 
-                        <section className="space-y-6">
-                            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Description</h2>
-                            <p className="text-xl text-gray-600 leading-relaxed font-medium">
-                                {property.description}
-                            </p>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-8">
-                                {[
-                                    { label: 'Type', value: 'Studio Unit' },
-                                    { label: 'Area', value: '45 sqm' },
-                                    { label: 'Furnished', value: 'Yes' },
-                                    { label: 'Lease', value: '6-12 Months' },
-                                ].map((spec, i) => (
-                                    <div key={i} className="p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{spec.label}</p>
-                                        <p className="text-gray-900 font-bold">{spec.value}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
+							<h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-6 leading-[0.85]">
+								{property.title.toUpperCase()}
+							</h1>
 
-                        <section className="p-8 rounded-[2rem] bg-gray-900 text-white relative overflow-hidden">
-                            <div className="relative z-10 space-y-4">
-                                <div className="flex items-center gap-3 opacity-60">
-                                    <Info className="w-5 h-5" />
-                                    <span className="text-sm font-bold uppercase tracking-widest">Protocol Intelligence</span>
-                                </div>
-                                <h3 className="text-2xl font-bold">Landlord Reputation Verified</h3>
-                                <p className="text-gray-400 max-w-lg">
-                                    The landlord address <span className="text-blue-400 font-mono break-all">{property.landlordAddress}</span> has a 100% on-chain success rate with 0 disputes.
-                                </p>
-                            </div>
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] -mr-32 -mt-32" />
-                        </section>
-                    </div>
+							<div className="flex items-center text-2xl text-gray-500 font-bold tracking-tight">
+								<MapPin className="w-6 h-6 mr-3 text-blue-500" />
+								{property.location}
+							</div>
+						</section>
 
-                    {/* Right Column: Transaction */}
-                    <div className="space-y-8">
-                        <Card className="sticky top-24 rounded-[2.5rem] border-none shadow-2xl shadow-blue-200/50 overflow-hidden">
-                            <CardHeader className="bg-blue-600 text-white p-8">
-                                <CardTitle className="text-lg opacity-80 uppercase tracking-widest mb-2 font-bold">Rental Summary</CardTitle>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-5xl font-black">{property.rentADA}</span>
-                                    <span className="text-xl font-bold opacity-80">ADA / mo</span>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-8 space-y-6 bg-white">
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center py-4 border-b border-gray-50">
-                                        <span className="text-gray-500 font-medium">Security Deposit</span>
-                                        <span className="text-xl font-black text-gray-900">{property.depositADA} ADA</span>
-                                    </div>
-                                    <div className="flex justify-between items-center py-4 border-b border-gray-50 font-bold">
-                                        <span className="text-gray-900">Initial Payment</span>
-                                        <span className="text-2xl font-black text-blue-600">{(property.rentADA + property.depositADA)} ADA</span>
-                                    </div>
-                                </div>
+						{/* Interactive Visual Element */}
+						<div className="aspect-[21/9] rounded-[3rem] bg-[#0a0a0a] border border-white/5 relative overflow-hidden group shadow-2xl">
+							<div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-purple-900/20 group-hover:scale-105 transition-transform duration-[1500ms]" />
+							<div className="absolute inset-0 crypto-grid opacity-20" />
 
-                                {isConfirmed ? (
-                                    <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 text-center animate-in zoom-in duration-500">
-                                        <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-emerald-200">
-                                            <CheckCircle2 className="w-7 h-7" />
-                                        </div>
-                                        <h4 className="text-xl font-bold text-emerald-900 mb-2">Rental Active</h4>
-                                        <p className="text-emerald-700 text-sm mb-2 font-medium">Congratulations! You are now the tenant of this property.</p>
-                                        {txHash && (
-                                            <p className="text-[10px] text-emerald-600 font-mono mb-6 break-all opacity-70">
-                                                Tx: {txHash}
-                                            </p>
-                                        )}
-                                        <Link href="/my-rentals" className="w-full">
-                                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-12">
-                                                View in Dashboard
-                                            </Button>
-                                        </Link>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {!connectedWalletName ? (
-                                            <Button 
-                                                onClick={() => setShowWalletModal(true)} 
-                                                className="w-full h-16 rounded-2xl bg-gray-900 hover:bg-black text-white text-lg font-bold transition-all shadow-xl shadow-gray-200 group"
-                                            >
-                                                <Wallet className="mr-3 w-6 h-6 group-hover:rotate-12 transition-transform" />
-                                                Connect Wallet
-                                            </Button>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold">
-                                                            {connectedWalletName[0].toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">Connected</p>
-                                                            <p className="text-gray-900 font-bold">{connectedWalletName}</p>
-                                                        </div>
-                                                    </div>
-                                                    <Button variant="ghost" size="sm" onClick={() => setConnectedWalletName(null)} className="text-blue-600 hover:bg-blue-100 font-bold">
-                                                        Switch
-                                                    </Button>
-                                                </div>
+							<div className="absolute top-10 left-10 space-y-4">
+								<Boxes className="w-12 h-12 text-blue-500/50" />
+								<div className="p-4 glass rounded-2xl border-white/5 space-y-1">
+									<p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
+										Lease Contract V2.1
+									</p>
+									<p className="text-white font-mono text-xs">
+										HASH: 9a2f...110e
+									</p>
+								</div>
+							</div>
 
-                                                <Button
-                                                    disabled={isPending}
-                                                    onClick={handlePayment}
-                                                    className={cn(
-                                                        "w-full h-16 rounded-2xl text-lg font-bold transition-all shadow-xl",
-                                                        isPending 
-                                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
-                                                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
-                                                    )}
-                                                >
-                                                    {isPending ? (
-                                                        <span className="flex items-center gap-3">
-                                                            <Clock className="w-6 h-6 animate-spin" />
-                                                            Processing...
-                                                        </span>
-                                                    ) : (
-                                                        <span className="flex items-center gap-2">
-                                                            Rent Property Now
-                                                            <ArrowRight className="w-5 h-5" />
-                                                        </span>
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        )}
-                                        
-                                        <p className="text-[10px] text-center text-gray-400 font-medium px-4 leading-relaxed">
-                                            By clicking above, you agree to the smart contract terms and will initiate a secure ADA transaction.
-                                        </p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+							<div className="absolute bottom-10 right-10 text-right">
+								<p className="text-4xl font-black text-white leading-none">
+									PREMIUM <br /> UNIT
+								</p>
+								<p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">
+									Inventory #00{property.id}
+								</p>
+							</div>
+						</div>
 
-                        {isPending && (
-                            <div className="p-6 bg-amber-50 rounded-3xl border border-amber-200 animate-pulse">
-                                <div className="flex gap-4">
-                                    <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-white shrink-0">
-                                        <Clock className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-amber-900 mb-1">On-Chain Indexing...</h4>
-                                        <p className="text-sm text-amber-800 opacity-80 leading-snug">
-                                            Cardano is securing your transaction. This usually takes 20-40 seconds. Please do not refresh.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </main>
+						<section className="space-y-8">
+							<h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+								Description
+							</h2>
+							<p className="text-2xl text-gray-400 leading-relaxed font-medium max-w-4xl">
+								{property.description}
+							</p>
 
-            {/* Wallet Modal */}
-            {showWalletModal && (
-                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
-                    <Card className="w-full max-w-md rounded-[2rem] border-none shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-                        <CardHeader className="p-8 pb-0">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <CardTitle className="text-2xl font-black text-gray-900">Connect Wallet</CardTitle>
-                                    <p className="text-gray-500 font-medium mt-1">Select your preferred Cardano provider.</p>
-                                </div>
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={() => setShowWalletModal(false)}
-                                    className="rounded-full hover:bg-gray-100"
-                                >
-                                    <ChevronLeft className="w-6 h-6 rotate-45" />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-8 pt-6 space-y-3">
-                            {availableWallets.length === 0 ? (
-                                <div className="text-center py-12">
-                                    <Wallet className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-                                    <p className="text-gray-500">No wallets detected in your browser.</p>
-                                    <Button variant="link" className="text-blue-600 mt-2">How to install?</Button>
-                                </div>
-                            ) : (
-                                availableWallets.map((w) => (
-                                    <button
-                                        key={w}
-                                        onClick={() => {
-                                            connectWallet(w);
-                                            setShowWalletModal(false);
-                                        }}
-                                        className="w-full flex items-center justify-between p-5 rounded-2xl border border-gray-100 hover:border-blue-600 hover:bg-blue-50/50 transition-all group"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-white rounded-xl shadow-sm border border-gray-50 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <div className="w-6 h-6 bg-blue-600 rounded-md" />
-                                            </div>
-                                            <span className="font-bold text-gray-900 text-lg capitalize">{w}</span>
-                                        </div>
-                                        <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-blue-600 rotate-180 transition-colors" />
-                                    </button>
-                                ))
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-        </div>
-    );
+							<div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t border-white/5">
+								{[
+									{ label: "Type", value: "Residential", icon: Terminal },
+									{ label: "Network", value: "Cardano", icon: Cpu },
+									{
+										label: "Identity",
+										value: "KYC Verified",
+										icon: Fingerprint,
+									},
+									{ label: "Term", value: "6-12 Mo", icon: Clock },
+								].map((spec, i) => (
+									<div
+										key={i}
+										className="space-y-2">
+										<div className="flex items-center gap-2 text-gray-500">
+											<spec.icon className="w-3 h-3" />
+											<span className="text-[10px] font-black uppercase tracking-widest">
+												{spec.label}
+											</span>
+										</div>
+										<p className="text-lg font-black text-white">
+											{spec.value}
+										</p>
+									</div>
+								))}
+							</div>
+						</section>
+
+						<div className="p-10 rounded-[3rem] bg-white text-black flex flex-col md:flex-row items-center justify-between gap-10 shadow-[0_0_50px_rgba(255,255,255,0.1)]">
+							<div className="space-y-3">
+								<h3 className="text-3xl font-black tracking-tighter leading-none">
+									SECURE SMART LEASE.
+								</h3>
+								<p className="text-gray-600 font-bold leading-snug">
+									Terms are cryptographically locked until deposit refund.
+								</p>
+							</div>
+							<Button className="h-14 px-10 bg-black text-white hover:bg-gray-800 font-black rounded-2xl shrink-0">
+								View Technical Docs
+							</Button>
+						</div>
+					</div>
+
+					{/* Transaction Sidebar */}
+					<div className="lg:col-span-4">
+						<div className="sticky top-24 space-y-8">
+							<Card className="rounded-[3rem] border-white/10 bg-[#0a0a0a] overflow-hidden shadow-2xl">
+								<div className="p-8 bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
+									<p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-4">
+										Initial Transaction
+									</p>
+									<div className="flex items-baseline gap-2">
+										<span className="text-6xl font-black tracking-tighter">
+											{property.rentADA + property.depositADA}
+										</span>
+										<span className="text-2xl font-bold opacity-70 tracking-tight">
+											ADA
+										</span>
+									</div>
+									<p className="text-[10px] font-black uppercase tracking-widest mt-4 bg-black/20 inline-block px-3 py-1 rounded-full border border-white/10">
+										Rent + Security Deposit
+									</p>
+								</div>
+
+								<CardContent className="p-10 space-y-10">
+									<div className="space-y-6">
+										<div className="flex justify-between items-center text-sm font-bold uppercase tracking-widest">
+											<span className="text-gray-500">Monthly Yield</span>
+											<span className="text-white">{property.rentADA} ADA</span>
+										</div>
+										<div className="flex justify-between items-center text-sm font-bold uppercase tracking-widest">
+											<span className="text-gray-500">Escrow Bond</span>
+											<span className="text-white">
+												{property.depositADA} ADA
+											</span>
+										</div>
+										<div className="h-px bg-white/5" />
+										<div className="flex justify-between items-center">
+											<span className="text-[10px] font-black uppercase tracking-widest text-blue-500">
+												Verification Rate
+											</span>
+											<span className="text-white font-mono text-sm">
+												99.98%
+											</span>
+										</div>
+									</div>
+
+									{isConfirmed ? (
+										<div className="space-y-6 animate-in zoom-in duration-500">
+											<div className="p-8 bg-emerald-500 text-black rounded-[2rem] text-center font-black">
+												<CheckCircle2 className="w-12 h-12 mx-auto mb-4" />
+												<p className="text-2xl tracking-tighter mb-1 uppercase">
+													LEASE_ACTIVATED
+												</p>
+												<p className="text-xs opacity-70 uppercase tracking-widest">
+													Access Granted
+												</p>
+											</div>
+											{txHash && (
+												<div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+													<p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2">
+														Tx Hash
+													</p>
+													<p className="text-blue-400 font-mono text-[10px] break-all">
+														{txHash}
+													</p>
+												</div>
+											)}
+											<Link
+												href="/my-rentals"
+												className="block">
+												<Button className="w-full h-16 rounded-2xl bg-white text-black font-black text-lg hover:bg-gray-200">
+													Open Dashboard
+												</Button>
+											</Link>
+										</div>
+									) : (
+										<div className="space-y-6">
+											{!connectedWalletName ? (
+												<Button
+													onClick={() => setShowWalletModal(true)}
+													className="w-full h-20 rounded-[2rem] bg-white text-black text-xl font-black hover:bg-gray-200 transition-all active:scale-95 shadow-[0_0_40px_rgba(255,255,255,0.1)]">
+													<Wallet2 className="mr-3 w-6 h-6" />
+													Initialize Wallet
+												</Button>
+											) : (
+												<div className="space-y-6">
+													<div className="p-6 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+														<div className="flex items-center gap-4">
+															<div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center font-black">
+																{connectedWalletName[0].toUpperCase()}
+															</div>
+															<div>
+																<p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+																	Authenticated
+																</p>
+																<p className="text-white font-bold">
+																	{connectedWalletName.toUpperCase()}
+																</p>
+															</div>
+														</div>
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() => setConnectedWalletName(null)}
+															className="text-red-500 hover:bg-red-500/10 font-black text-xs uppercase tracking-widest">
+															Reset
+														</Button>
+													</div>
+
+													<Button
+														disabled={isPending}
+														onClick={handlePayment}
+														className={cn(
+															"w-full h-20 rounded-[2rem] text-xl font-black transition-all",
+															isPending
+																? "bg-white/5 text-gray-500 cursor-not-allowed"
+																: "bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_40px_rgba(37,99,235,0.3)]",
+														)}>
+														{isPending ? (
+															<span className="flex items-center gap-3">
+																<div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
+																EXECUTING...
+															</span>
+														) : (
+															<span className="flex items-center gap-3">
+																EXECUTE CONTRACT
+																<ArrowRight className="w-6 h-6" />
+															</span>
+														)}
+													</Button>
+												</div>
+											)}
+										</div>
+									)}
+								</CardContent>
+							</Card>
+
+							{isPending && (
+								<div className="p-8 glass rounded-[2.5rem] border-blue-500/20 space-y-4 animate-pulse">
+									<div className="flex items-center gap-4">
+										<div className="w-3 h-3 bg-blue-500 rounded-full animate-ping" />
+										<p className="font-black uppercase tracking-widest text-[10px] text-blue-400">
+											Cardano_Protocol_Indexing
+										</p>
+									</div>
+									<p className="text-gray-400 text-sm font-medium leading-relaxed">
+										Submitting lease signature to the ledger. This action is
+										irreversible once confirmed.
+									</p>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			</main>
+
+			{/* Futuristic Modal */}
+			{showWalletModal && (
+				<div className="fixed inset-0 bg-black/80 backdrop-blur-2xl flex items-center justify-center z-[100] p-6 animate-in fade-in duration-500">
+					<Card className="w-full max-w-xl rounded-[3rem] border-white/10 bg-[#0a0a0a] overflow-hidden shadow-[0_0_100px_rgba(37,99,235,0.2)]">
+						<div className="p-12 space-y-10">
+							<div className="flex justify-between items-start">
+								<div className="space-y-2">
+									<h2 className="text-4xl font-black text-white uppercase tracking-tighter">
+										PROVIDER_SELECT
+									</h2>
+									<p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
+										Authorize connection to terminal
+									</p>
+								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => setShowWalletModal(false)}
+									className="rounded-full hover:bg-white/5 text-gray-500">
+									<ChevronLeft className="w-8 h-8 rotate-45" />
+								</Button>
+							</div>
+
+							<div className="grid gap-4">
+								{availableWallets.length === 0 ? (
+									<div className="text-center py-16 space-y-6">
+										<Terminal className="w-16 h-16 text-white/5 mx-auto" />
+										<p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
+											No active providers detected
+										</p>
+										<Button className="bg-white/5 text-white border-white/10">
+											Install Extension
+										</Button>
+									</div>
+								) : (
+									availableWallets.map((w) => (
+										<button
+											key={w}
+											onClick={() => {
+												connectWallet(w);
+												setShowWalletModal(false);
+											}}
+											className="w-full flex items-center justify-between p-8 rounded-3xl border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-blue-500/50 transition-all group">
+											<div className="flex items-center gap-6">
+												<div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl shadow-black">
+													<div className="w-8 h-8 bg-blue-600 rounded-lg shadow-inner" />
+												</div>
+												<span className="font-black text-white text-2xl uppercase tracking-tighter">
+													{w}
+												</span>
+											</div>
+											<div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center group-hover:bg-blue-600 group-hover:border-blue-400 transition-all">
+												<ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-white" />
+											</div>
+										</button>
+									))
+								)}
+							</div>
+						</div>
+					</Card>
+				</div>
+			)}
+		</div>
+	);
 }

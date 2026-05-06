@@ -5,7 +5,7 @@ import PropertyCard from '@/components/PropertyCard';
 import { properties } from '@/data/mockData';
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { ShieldCheck, PlusCircle, Search } from "lucide-react";
+import { PlusCircle, Search, Activity, LayoutDashboard } from "lucide-react";
 
 export default function MyRentalsPage() {
     const [rentedProperties, setRentedProperties] = useState<any[]>([]);
@@ -19,54 +19,62 @@ export default function MyRentalsPage() {
     }, []);
 
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-[#030303] text-white crypto-grid">
             <Navbar />
             
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
-                    <div className="space-y-2">
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-                            My <span className="text-blue-600">Rentals.</span>
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-20">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-blue-500 font-black tracking-widest text-[10px] uppercase">
+                            <LayoutDashboard className="w-4 h-4" />
+                            Terminal / User / Portfolio
+                        </div>
+                        <h1 className="text-6xl font-black text-white tracking-tighter uppercase leading-[0.8]">
+                            ACTIVE <br />
+                            <span className="text-gradient">PORTFOLIO.</span>
                         </h1>
-                        <p className="text-gray-500 font-medium">Manage your active leases and security deposits on-chain.</p>
+                        <p className="text-gray-500 font-bold text-lg max-w-md leading-snug">Manage your cryptographically secured rental assets and active leases.</p>
                     </div>
                     
                     <Link href="/listings">
-                        <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 h-12 px-6">
-                            <PlusCircle className="mr-2 w-4 h-4" />
-                            Find New Property
+                        <Button className="rounded-2xl bg-white text-black hover:bg-gray-200 h-14 px-8 font-black uppercase tracking-tighter shadow-lg shadow-white/5 transition-all active:scale-95">
+                            <PlusCircle className="mr-2 w-5 h-5" />
+                            New Lease
                         </Button>
                     </Link>
                 </div>
 
                 {isLoading ? (
-                    <div className="text-center py-24 space-y-4">
-                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                        <p className="text-gray-500 font-medium">Fetching your on-chain records...</p>
+                    <div className="text-center py-32 space-y-6">
+                        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_20px_rgba(37,99,235,0.3)]" />
+                        <p className="text-gray-500 font-black uppercase tracking-widest text-xs">Synchronizing with Ledger...</p>
                     </div>
                 ) : rentedProperties.length === 0 ? (
-                    <div className="bg-white/50 backdrop-blur-md rounded-[3rem] p-16 text-center border border-dashed border-gray-200">
-                        <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center text-blue-600 mx-auto mb-6">
-                            <ShieldCheck className="w-10 h-10" />
+                    <div className="bg-white/[0.02] backdrop-blur-3xl rounded-[4rem] p-24 text-center border border-dashed border-white/10 relative overflow-hidden">
+                        <div className="absolute inset-0 crypto-grid opacity-10" />
+                        <div className="relative z-10">
+                            <div className="w-24 h-24 bg-blue-600/10 rounded-[2rem] flex items-center justify-center text-blue-500 mx-auto mb-8 border border-blue-500/20 shadow-[0_0_50px_rgba(37,99,235,0.1)]">
+                                <Activity className="w-12 h-12" />
+                            </div>
+                            <h3 className="text-3xl font-black text-white mb-3 uppercase tracking-tighter">Zero Active Leases</h3>
+                            <p className="text-gray-500 max-w-sm mx-auto mb-10 font-bold text-lg leading-snug">
+                                No cryptographic agreements detected at this address. Initialize a new lease from the terminal.
+                            </p>
+                            <Link href="/listings">
+                                <Button size="lg" className="rounded-[2rem] h-20 px-12 bg-blue-600 hover:bg-blue-500 text-white font-black text-xl shadow-[0_0_40px_rgba(37,99,235,0.3)] transition-all">
+                                    <Search className="mr-3 w-6 h-6" />
+                                    Explore Terminal
+                                </Button>
+                            </Link>
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">No Active Rentals</h3>
-                        <p className="text-gray-500 max-w-sm mx-auto mb-8 font-medium">
-                            You haven&apos;t secured any properties yet. Your future home is just a transaction away.
-                        </p>
-                        <Link href="/listings">
-                            <Button size="lg" className="rounded-2xl h-14 px-8 bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-200">
-                                <Search className="mr-2 w-5 h-5" />
-                                Start Browsing
-                            </Button>
-                        </Link>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                         {rentedProperties.map((property) => (
-                            <div key={property.id} className="relative group animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="absolute top-4 right-4 z-20">
-                                    <div className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg shadow-emerald-200">
-                                        Active Lease
+                            <div key={property.id} className="relative group animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                <div className="absolute top-6 right-6 z-20">
+                                    <div className="bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg shadow-emerald-500/20 border border-emerald-400">
+                                        Active_Node
                                     </div>
                                 </div>
                                 <PropertyCard

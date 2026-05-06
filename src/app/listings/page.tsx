@@ -1,43 +1,49 @@
 import Navbar from '@/components/Navbar';
 import PropertyCard from '@/components/PropertyCard';
 import { properties } from '@/data/mockData';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, Terminal } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
 export default function ListingsPage() {
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-[#030303] text-white crypto-grid">
             <Navbar />
             
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                {/* Header & Search */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
-                    <div className="space-y-2">
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-                            Available <span className="text-blue-600">Spaces.</span>
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                {/* Protocol Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-20">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-blue-500 font-black tracking-widest text-[10px] uppercase">
+                            <Terminal className="w-4 h-4" />
+                            Protocol / Assets / Listings
+                        </div>
+                        <h1 className="text-6xl font-black text-white tracking-tighter uppercase leading-[0.8]">
+                            ACTIVE <br />
+                            <span className="text-gradient">INVENTORY.</span>
                         </h1>
-                        <p className="text-gray-500 font-medium">Explore hand-picked properties across the Philippines.</p>
+                        <p className="text-gray-500 font-bold text-lg max-w-md leading-snug">Verifiable real-estate assets secured on the Cardano blockchain.</p>
                     </div>
                     
-                    <div className="w-full md:w-auto flex items-center gap-3">
-                        <div className="relative flex-1 md:w-80">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <div className="w-full md:w-auto flex items-center gap-4">
+                        <div className="relative flex-1 md:w-96">
+                            <div className="absolute inset-0 bg-blue-500/5 blur-xl rounded-2xl" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                             <Input 
-                                placeholder="Search by location..." 
-                                className="pl-10 h-12 bg-white/50 border-gray-200 rounded-xl focus:ring-blue-600/20 transition-all"
+                                placeholder="Query location..." 
+                                className="pl-12 h-14 bg-white/[0.03] border-white/5 rounded-2xl text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-700"
                             />
                         </div>
-                        <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-gray-200 bg-white/50">
-                            <SlidersHorizontal className="w-5 h-5 text-gray-600" />
+                        <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-white/5 bg-white/[0.03] hover:bg-white/10 transition-all">
+                            <SlidersHorizontal className="w-5 h-5 text-gray-400" />
                         </Button>
                     </div>
                 </div>
 
                 {/* Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                     {properties.map((property) => (
-                        <div key={property.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${property.id * 100}ms` }}>
+                        <div key={property.id} className="animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: `${property.id * 150}ms` }}>
                             <PropertyCard
                                 id={property.id}
                                 title={property.title}
@@ -50,10 +56,11 @@ export default function ListingsPage() {
                     ))}
                 </div>
 
-                {/* Pagination Placeholder */}
-                <div className="mt-16 flex justify-center">
-                    <Button variant="ghost" className="text-gray-500 font-bold hover:text-blue-600">
-                        View More Properties
+                {/* Protocol Load More */}
+                <div className="mt-24 flex flex-col items-center gap-4">
+                    <div className="w-1 h-20 bg-gradient-to-b from-blue-600 to-transparent" />
+                    <Button variant="ghost" className="text-gray-500 font-black uppercase tracking-widest text-xs hover:text-white hover:bg-transparent">
+                        End of Protocol Stream
                     </Button>
                 </div>
             </main>
