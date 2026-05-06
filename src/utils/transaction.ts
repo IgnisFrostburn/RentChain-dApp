@@ -18,7 +18,10 @@ export const sendLovelace = async (
     const utxos = await (wallet.getUtxosMesh());
     const changeAddress = await wallet.getChangeAddressBech32();
 
-    if (utxos == null) throw new Error("No UTXOs found in wallet");
+    if (utxos == null) {
+        alert("No UTXOs found in wallet");
+        throw new Error("No UTXOs found in wallet");
+    }
 
     const unsignedTx = await txBuilder
         .txOut(

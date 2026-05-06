@@ -2,12 +2,33 @@
 
 import Navbar from '@/components/Navbar';
 import { FormEvent } from 'react';
+import { getAvailableWallets, connectWallet } from '@/utils/walletUtils';
+import { MeshCardanoBrowserWallet } from '@meshsdk/wallet';
+import { useEffect, useState } from 'react';
+import WalletModal from '@/components/WalletModal';
 
 export default function ListPropertyPage() {
     const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        // No functionality yet
     };
+
+    const [wallet, setWallet] = useState<MeshCardanoBrowserWallet | null>(null);
+    const [availableWallets, setAvailableWallets] = useState<string[]>([]);
+    const [showWalletModal, setShowWalletModal] = useState(false);
+    const [usedAddress, setUsedAddress] = useState("");
+
+    const connect = async (walletName: string) => {
+        const wallet = await connectWallet(walletName);
+        setWallet(wallet);
+        const addresses = await wallet?.getUsedAddressesBech32()
+        setUsedAddress(addresses?.[0] || "");
+        console.log("Connected wallet with main address:", addresses?.[0]);
+    }
+
+    useEffect(() => {
+        const wallets = getAvailableWallets();
+        setAvailableWallets(wallets);
+    }, []);
 
     return (
         <>
@@ -86,6 +107,39 @@ export default function ListPropertyPage() {
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                                 />
                             </div>
+
+                            {/* Wallet Address */}
+                            <div>
+                                <label htmlFor="address" className="block text-sm font-medium text-gray-900 mb-2">
+                                    Landlord Wallet Address
+                                </label>
+                                <input
+                                    type="text"
+                                    id="address"
+                                    placeholder="e.g., addr1..."
+                                    disabled
+                                    value={usedAddress}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-not-allowed bg-gray-100"
+                                />
+                            </div>
+
+                            {showWalletModal &&
+                                <WalletModal
+                                    availableWallets={availableWallets}
+                                    onClose={() => setShowWalletModal(false)}
+                                    onSelectWallet={(walletName) => {
+                                        connect(walletName);
+                                    }}
+                                />
+                            }
+
+                            {/* Connect Button */}
+                            <button
+                                onClick={() => setShowWalletModal(true)}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"
+                            >
+                                Connect Wallet
+                            </button>
 
                             {/* Submit Button */}
                             <button

@@ -17,7 +17,7 @@ export const properties = [
         rentADA: 350,
         depositADA: 700,
         status: "Available",
-        landlordAddress: "addr_test1qz...def456",
+        landlordAddress: "addr_test1qq6jsx68atfx4rx9tp3fu80gpf8sy2qz5dyvry2jv78w95rw0mwuuck9qpec3sfz9jnvmf9u3mdymevflqla8szmrpts42ttrr",
     },
     {
         id: 3,
