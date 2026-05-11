@@ -39,7 +39,6 @@ export default function ListPropertyPage() {
 
                     <div className="bg-white rounded-lg shadow-lg p-8">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Property Title */}
                             <div>
                                 <label htmlFor="title" className="block text-sm font-medium text-gray-900 mb-2">
                                     Property Title
@@ -52,7 +51,6 @@ export default function ListPropertyPage() {
                                 />
                             </div>
 
-                            {/* Description */}
                             <div>
                                 <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-2">
                                     Description
@@ -65,7 +63,6 @@ export default function ListPropertyPage() {
                                 ></textarea>
                             </div>
 
-                            {/* Location */}
                             <div>
                                 <label htmlFor="location" className="block text-sm font-medium text-gray-900 mb-2">
                                     Location
@@ -78,7 +75,6 @@ export default function ListPropertyPage() {
                                 />
                             </div>
 
-                            {/* Rent Amount */}
                             <div>
                                 <label htmlFor="rent" className="block text-sm font-medium text-gray-900 mb-2">
                                     Rent Amount (ADA)
@@ -93,7 +89,6 @@ export default function ListPropertyPage() {
                                 />
                             </div>
 
-                            {/* Deposit Amount */}
                             <div>
                                 <label htmlFor="deposit" className="block text-sm font-medium text-gray-900 mb-2">
                                     Deposit Amount (ADA)
@@ -108,7 +103,6 @@ export default function ListPropertyPage() {
                                 />
                             </div>
 
-                            {/* Wallet Address */}
                             <div>
                                 <label htmlFor="address" className="block text-sm font-medium text-gray-900 mb-2">
                                     Landlord Wallet Address
@@ -133,7 +127,6 @@ export default function ListPropertyPage() {
                                 />
                             }
 
-                            {/* Connect Button */}
                             <button
                                 onClick={() => setShowWalletModal(true)}
                                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"
@@ -141,7 +134,6 @@ export default function ListPropertyPage() {
                                 Connect Wallet
                             </button>
 
-                            {/* Submit Button */}
                             <button
                                 type="submit"
                                 className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition"
