@@ -1,18 +1,69 @@
 'use client';
 
 import Navbar from '@/components/Navbar';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Label } from '@/components/ui/Label';
-import { MapPin, Coins, Info, ArrowRight, Activity, Terminal } from 'lucide-react';
+import { useWallet } from '@/contexts/WalletContext';
+import { MapPin, Coins, Info, ArrowRight, Activity, Terminal, Wallet2 } from 'lucide-react';
 
 export default function ListPropertyPage() {
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    const router = useRouter();
+    const { connectedWalletName, walletAddress, setShowWalletModal } = useWallet();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        alert("Listing submission logic would go here. In this demo, listings are static mock data.");
+
+        if (!connectedWalletName) {
+            setShowWalletModal(true);
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        const formData = new FormData(e.currentTarget);
+        const title = formData.get('title') as string;
+        const location = formData.get('location') as string;
+        const rentADA = parseInt(formData.get('rent') as string);
+        const depositADA = parseInt(formData.get('deposit') as string);
+        const description = formData.get('description') as string;
+
+        // Use the connected wallet address as the landlord address
+        const landlordAddress = walletAddress || "addr_test1vph779m96nxjd3s28t8eeqkt4e2x4gsfkrmszpty4qylxsggdze6w";
+
+        const newProperty = {
+            id: Date.now(), // Unique ID
+            title,
+            location,
+            rentADA,
+            depositADA,
+            description,
+            status: 'Available',
+            landlordAddress
+        };
+
+        try {
+            // Simulate network delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Save to localStorage
+            const mintedProperties = JSON.parse(localStorage.getItem('mintedProperties') || '[]');
+            mintedProperties.push(newProperty);
+            localStorage.setItem('mintedProperties', JSON.stringify(mintedProperties));
+
+            alert("Property successfully initialized on the protocol!");
+            router.push('/listings');
+        } catch (error) {
+            console.error("Error minting property:", error);
+            alert("Error initializing property. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -71,6 +122,8 @@ export default function ListPropertyPage() {
                                             <Label htmlFor="title" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">Protocol Title</Label>
                                             <Input
                                                 id="title"
+                                                name="title"
+                                                required
                                                 placeholder="PH_CEBU_STUDIO_01"
                                                 className="h-14 rounded-2xl border-white/5 bg-white/[0.03] text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
                                             />
@@ -82,6 +135,8 @@ export default function ListPropertyPage() {
                                                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700" />
                                                 <Input
                                                     id="location"
+                                                    name="location"
+                                                    required
                                                     placeholder="Coordinate or Address"
                                                     className="h-14 pl-12 rounded-2xl border-white/5 bg-white/[0.03] text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
                                                 />
@@ -93,7 +148,9 @@ export default function ListPropertyPage() {
                                                 <Label htmlFor="rent" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">Rent_ADA</Label>
                                                 <Input
                                                     id="rent"
+                                                    name="rent"
                                                     type="number"
+                                                    required
                                                     placeholder="0.00"
                                                     className="h-14 rounded-2xl border-white/5 bg-white/[0.03] text-white font-black focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
                                                 />
@@ -102,7 +159,9 @@ export default function ListPropertyPage() {
                                                 <Label htmlFor="deposit" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">Bond_ADA</Label>
                                                 <Input
                                                     id="deposit"
+                                                    name="deposit"
                                                     type="number"
+                                                    required
                                                     placeholder="0.00"
                                                     className="h-14 rounded-2xl border-white/5 bg-white/[0.03] text-white font-black focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
                                                 />
@@ -113,15 +172,35 @@ export default function ListPropertyPage() {
                                             <Label htmlFor="description" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">Node Description</Label>
                                             <Textarea
                                                 id="description"
+                                                name="description"
+                                                required
                                                 placeholder="Define asset amenities and parameters..."
                                                 rows={4}
                                                 className="rounded-2xl border-white/5 bg-white/[0.03] text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
                                             />
                                         </div>
 
-                                        <Button type="submit" className="w-full h-20 rounded-[2rem] bg-white text-black text-xl font-black hover:bg-blue-600 hover:text-white transition-all shadow-xl active:scale-95 group">
-                                            Initialize Asset Node
-                                            <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                                        <Button 
+                                            type="submit" 
+                                            disabled={isSubmitting}
+                                            className="w-full h-20 rounded-[2rem] bg-white text-black text-xl font-black hover:bg-blue-600 hover:text-white transition-all shadow-xl active:scale-95 group disabled:opacity-50"
+                                        >
+                                            {!connectedWalletName ? (
+                                                <span className="flex items-center gap-3 uppercase">
+                                                    <Wallet2 className="w-6 h-6" />
+                                                    Initialize Wallet
+                                                </span>
+                                            ) : isSubmitting ? (
+                                                <span className="flex items-center gap-3">
+                                                    <div className="w-5 h-5 border-2 border-gray-500 border-t-black rounded-full animate-spin" />
+                                                    INITIALIZING...
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-3">
+                                                    Initialize Asset Node
+                                                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                                                </span>
+                                            )}
                                         </Button>
                                     </form>
                                 </CardContent>

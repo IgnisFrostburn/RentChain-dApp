@@ -1,11 +1,25 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import PropertyCard from '@/components/PropertyCard';
-import { properties } from '@/data/mockData';
+import { properties as mockProperties } from '@/data/mockData';
 import { Search, SlidersHorizontal, Terminal } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
 export default function ListingsPage() {
+    const [allProperties, setAllProperties] = useState<any[]>([]);
+
+    useEffect(() => {
+        // Combine mock data with minted data from localStorage
+        const mintedProperties = JSON.parse(localStorage.getItem('mintedProperties') || '[]');
+        
+        // Actually a simple concat is fine for now as we use unique Date.now() for minted ones
+        const merged = [...mockProperties, ...mintedProperties];
+        setAllProperties(merged);
+    }, []);
+
     return (
         <div className="min-h-screen bg-[#030303] text-white crypto-grid">
             <Navbar />
@@ -42,8 +56,8 @@ export default function ListingsPage() {
 
                 {/* Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                    {properties.map((property) => (
-                        <div key={property.id} className="animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: `${property.id * 150}ms` }}>
+                    {allProperties.map((property, index) => (
+                        <div key={property.id} className="animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: `${index * 150}ms` }}>
                             <PropertyCard
                                 id={property.id}
                                 title={property.title}

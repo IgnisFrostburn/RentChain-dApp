@@ -2,21 +2,38 @@
 import { useState, useEffect } from "react";
 import Navbar from '@/components/Navbar';
 import PropertyCard from '@/components/PropertyCard';
-import { properties } from '@/data/mockData';
+import { properties as mockProperties } from '@/data/mockData';
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { PlusCircle, Search, Activity, LayoutDashboard } from "lucide-react";
+import { PlusCircle, Search, Activity, LayoutDashboard, Wallet2 } from "lucide-react";
+import { useWallet } from "@/contexts/WalletContext";
 
 export default function MyRentalsPage() {
+    const { connectedWalletName, walletAddress, setShowWalletModal } = useWallet();
     const [rentedProperties, setRentedProperties] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const rentedIds = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
-        const filtered = properties.filter(p => rentedIds.includes(p.id));
+        if (!walletAddress) {
+            setRentedProperties([]);
+            setIsLoading(false);
+            return;
+        }
+
+        const mintedProperties = JSON.parse(localStorage.getItem('mintedProperties') || '[]');
+        const allProperties = [...mockProperties, ...mintedProperties];
+
+        const rentedByWallet = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
+        
+        // Also check if any old global properties were rented (for backward compatibility during demo)
+        const oldRentedIds = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
+        
+        const combinedIds = Array.from(new Set([...rentedByWallet, ...oldRentedIds]));
+
+        const filtered = allProperties.filter(p => combinedIds.includes(p.id));
         setRentedProperties(filtered);
         setIsLoading(false);
-    }, []);
+    }, [walletAddress]);
 
     return (
         <div className="min-h-screen bg-[#030303] text-white crypto-grid">
@@ -48,6 +65,27 @@ export default function MyRentalsPage() {
                     <div className="text-center py-32 space-y-6">
                         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_20px_rgba(37,99,235,0.3)]" />
                         <p className="text-gray-500 font-black uppercase tracking-widest text-xs">Synchronizing with Ledger...</p>
+                    </div>
+                ) : !connectedWalletName ? (
+                    <div className="bg-white/[0.02] backdrop-blur-3xl rounded-[4rem] p-24 text-center border border-dashed border-white/10 relative overflow-hidden">
+                        <div className="absolute inset-0 crypto-grid opacity-10" />
+                        <div className="relative z-10">
+                            <div className="w-24 h-24 bg-blue-600/10 rounded-[2rem] flex items-center justify-center text-blue-500 mx-auto mb-8 border border-blue-500/20 shadow-[0_0_50px_rgba(37,99,235,0.1)]">
+                                <Wallet2 className="w-12 h-12" />
+                            </div>
+                            <h3 className="text-3xl font-black text-white mb-3 uppercase tracking-tighter">Authentication Required</h3>
+                            <p className="text-gray-500 max-w-sm mx-auto mb-10 font-bold text-lg leading-snug">
+                                Connect your Cardano wallet to view your active cryptographic leases and portfolio.
+                            </p>
+                            <Button 
+                                onClick={() => setShowWalletModal(true)}
+                                size="lg" 
+                                className="rounded-[2rem] h-20 px-12 bg-blue-600 hover:bg-blue-500 text-white font-black text-xl shadow-[0_0_40px_rgba(37,99,235,0.3)] transition-all"
+                            >
+                                <Wallet2 className="mr-3 w-6 h-6" />
+                                Initialize Wallet
+                            </Button>
+                        </div>
                     </div>
                 ) : rentedProperties.length === 0 ? (
                     <div className="bg-white/[0.02] backdrop-blur-3xl rounded-[4rem] p-24 text-center border border-dashed border-white/10 relative overflow-hidden">

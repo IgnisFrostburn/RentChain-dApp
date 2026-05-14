@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
-import { MeshCardanoBrowserWallet } from "@meshsdk/wallet";
 import Link from "next/link";
 import Navbar from "./Navbar";
 import { sendLovelace, waitForTransaction } from "@/utils/transaction";
 import { Button } from "./ui/Button";
 import { Card, CardContent } from "./ui/Card";
 import { Badge } from "./ui/Badge";
+import { useWallet } from "@/contexts/WalletContext";
 import {
 	ChevronLeft,
 	MapPin,
@@ -23,27 +23,37 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function PropertyDetail({ property }: { property: any }) {
-	const [wallet, setWallet] = useState<MeshCardanoBrowserWallet | null>(null);
-	const [connectedWalletName, setConnectedWalletName] = useState<string | null>(
-		null,
-	);
-	const [availableWallets, setAvailableWallets] = useState<string[]>([]);
-	const [showWalletModal, setShowWalletModal] = useState(false);
+	const { 
+		wallet, 
+		connectedWalletName, 
+		walletAddress,
+		setShowWalletModal 
+	} = useWallet();
 	const [isPending, setIsPending] = useState(false);
 	const [isConfirmed, setIsConfirmed] = useState(false);
 	const [txHash, setTxHash] = useState<string | null>(null);
 
 	useEffect(() => {
-		const rentedProperties = JSON.parse(
-			localStorage.getItem("rentedProperties") || "[]",
-		);
-		if (property && rentedProperties.includes(property.id)) {
-			setIsConfirmed(true);
+		if (!walletAddress) {
+			setIsConfirmed(false);
+			return;
 		}
-	}, [property]);
+
+		// Check wallet-specific rentals
+		const rentedByWallet = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
+		
+		// Also check old global rentals for backward compatibility
+		const oldRentedIds = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
+		
+		if (property && (rentedByWallet.includes(property.id) || oldRentedIds.includes(property.id))) {
+			setIsConfirmed(true);
+		} else {
+			setIsConfirmed(false);
+		}
+	}, [property, walletAddress]);
 
 	const handlePayment = async () => {
-		if (!wallet || !property) return;
+		if (!wallet || !property || !walletAddress) return;
 		try {
 			setIsPending(true);
 			const hash = await sendLovelace(
@@ -55,15 +65,19 @@ export default function PropertyDetail({ property }: { property: any }) {
 			const confirmed = await waitForTransaction(hash);
 			if (confirmed) {
 				setIsConfirmed(true);
-				const rentedProperties = JSON.parse(
-					localStorage.getItem("rentedProperties") || "[]",
-				);
-				if (!rentedProperties.includes(property.id)) {
-					rentedProperties.push(property.id);
-					localStorage.setItem(
-						"rentedProperties",
-						JSON.stringify(rentedProperties),
-					);
+				
+				// Save to wallet-specific storage
+				const rentedByWallet = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
+				if (!rentedByWallet.includes(property.id)) {
+					rentedByWallet.push(property.id);
+					localStorage.setItem(`rentedProperties_${walletAddress}`, JSON.stringify(rentedByWallet));
+				}
+
+				// Also update legacy storage for safety
+				const oldRentedIds = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
+				if (!oldRentedIds.includes(property.id)) {
+					oldRentedIds.push(property.id);
+					localStorage.setItem("rentedProperties", JSON.stringify(oldRentedIds));
 				}
 			} else {
 				alert("Transaction submission timed out. Please check your wallet.");
@@ -75,30 +89,6 @@ export default function PropertyDetail({ property }: { property: any }) {
 			setIsPending(false);
 		}
 	};
-
-	const connectWallet = async (walletName: string) => {
-		try {
-			if (walletName == "Disconnected") return;
-			const wallet = await MeshCardanoBrowserWallet.enable(walletName);
-			setWallet(wallet);
-			setConnectedWalletName(walletName);
-		} catch (error) {
-			console.error("Error connecting wallet:", error);
-		}
-	};
-
-	useEffect(() => {
-		const getAvailableWallets = async () => {
-			try {
-				const wallets = MeshCardanoBrowserWallet.getInstalledWallets();
-				const walletNames = wallets.map((wallet) => wallet.name);
-				setAvailableWallets(walletNames);
-			} catch (error) {
-				console.error("Error fetching available wallets:", error);
-			}
-		};
-		getAvailableWallets();
-	}, []);
 
 	if (!property) {
 		return (
@@ -156,7 +146,7 @@ export default function PropertyDetail({ property }: { property: any }) {
 
 						{/* Interactive Visual Element */}
 						<div className="aspect-[21/9] rounded-[3rem] bg-[#0a0a0a] border border-white/5 relative overflow-hidden group shadow-2xl">
-							<div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-purple-900/20 group-hover:scale-105 transition-transform duration-[1500ms]" />
+							<div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-purple-900/20 group-hover:scale-105 transition-transform duration-1000" />
 							<div className="absolute inset-0 crypto-grid opacity-20" />
 
 							<div className="absolute top-10 left-10 space-y-4">
@@ -333,7 +323,7 @@ export default function PropertyDetail({ property }: { property: any }) {
 														<Button
 															variant="ghost"
 															size="sm"
-															onClick={() => setConnectedWalletName(null)}
+															onClick={() => setShowWalletModal(true)}
 															className="text-red-500 hover:bg-red-500/10 font-black text-xs uppercase tracking-widest">
 															Reset
 														</Button>
@@ -385,69 +375,6 @@ export default function PropertyDetail({ property }: { property: any }) {
 					</div>
 				</div>
 			</main>
-
-			{/* Futuristic Modal */}
-			{showWalletModal && (
-				<div className="fixed inset-0 bg-black/80 backdrop-blur-2xl flex items-center justify-center z-[100] p-6 animate-in fade-in duration-500">
-					<Card className="w-full max-w-xl rounded-[3rem] border-white/10 bg-[#0a0a0a] overflow-hidden shadow-[0_0_100px_rgba(37,99,235,0.2)]">
-						<div className="p-12 space-y-10">
-							<div className="flex justify-between items-start">
-								<div className="space-y-2">
-									<h2 className="text-4xl font-black text-white uppercase tracking-tighter">
-										PROVIDER_SELECT
-									</h2>
-									<p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
-										Authorize connection to terminal
-									</p>
-								</div>
-								<Button
-									variant="ghost"
-									size="icon"
-									onClick={() => setShowWalletModal(false)}
-									className="rounded-full hover:bg-white/5 text-gray-500">
-									<ChevronLeft className="w-8 h-8 rotate-45" />
-								</Button>
-							</div>
-
-							<div className="grid gap-4">
-								{availableWallets.length === 0 ? (
-									<div className="text-center py-16 space-y-6">
-										<Terminal className="w-16 h-16 text-white/5 mx-auto" />
-										<p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
-											No active providers detected
-										</p>
-										<Button className="bg-white/5 text-white border-white/10">
-											Install Extension
-										</Button>
-									</div>
-								) : (
-									availableWallets.map((w) => (
-										<button
-											key={w}
-											onClick={() => {
-												connectWallet(w);
-												setShowWalletModal(false);
-											}}
-											className="w-full flex items-center justify-between p-8 rounded-3xl border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-blue-500/50 transition-all group">
-											<div className="flex items-center gap-6">
-												<div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl shadow-black">
-													<div className="w-8 h-8 bg-blue-600 rounded-lg shadow-inner" />
-												</div>
-												<span className="font-black text-white text-2xl uppercase tracking-tighter">
-													{w}
-												</span>
-											</div>
-											<div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center group-hover:bg-blue-600 group-hover:border-blue-400 transition-all">
-												<ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-white" />
-											</div>
-										</button>
-									))
-								)}
-							</div>
-						</div>
-					</Card>
-				</div>
-			)}
 		</div>
 	);
 }
