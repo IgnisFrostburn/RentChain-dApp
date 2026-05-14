@@ -4,6 +4,8 @@ import { MeshCardanoBrowserWallet } from "@meshsdk/wallet";
 import Link from "next/link";
 import Navbar from "./Navbar";
 import { sendLovelace, waitForTransaction } from "@/utils/transaction";
+import WalletModal from "./WalletModal";
+import { getAvailableWallets, connectWallet } from "@/utils/walletUtils";
 
 export default function PropertyDetail({ property }: { property: any }) {
     const [wallet, setWallet] = useState<MeshCardanoBrowserWallet | null>(null);
@@ -56,29 +58,14 @@ export default function PropertyDetail({ property }: { property: any }) {
         }
     };
 
-    const connectWallet = async (walletName: string) => {
-        try {
-            if (walletName == "Disconnected") return;
-            const wallet = await MeshCardanoBrowserWallet.enable(walletName);
-            setWallet(wallet);
-            setConnectedWalletName(walletName);
-            console.log("Wallet connected:", wallet);
-        } catch (error) {
-            console.error("Error connecting wallet:", error);
-        }
+    const connect = async (walletName: string) => {
+        const wallet = await connectWallet(walletName);
+        setWallet(wallet);
     }
 
     useEffect(() => {
-        const getAvailableWallets = async () => {
-            try {
-                const wallets = MeshCardanoBrowserWallet.getInstalledWallets();
-                const walletNames = wallets.map((wallet) => wallet.name);
-                setAvailableWallets(walletNames);
-            } catch (error) {
-                console.error("Error fetching available wallets:", error);
-            }
-        };
-        getAvailableWallets();
+        const wallets = getAvailableWallets();
+        setAvailableWallets(wallets);
     }, []);
 
     if (!property) {
@@ -160,56 +147,15 @@ export default function PropertyDetail({ property }: { property: any }) {
                                 <p className="text-lg font-mono text-gray-800">{property.landlordAddress}</p>
                             </div>
 
-                            {isPending && (
-                                <div className="mb-8 p-6 bg-yellow-50 border border-yellow-200 rounded-lg animate-pulse">
-                                    <h4 className="text-yellow-900 font-bold mb-1">Transaction Submitted!</h4>
-                                    <p className="text-yellow-800 text-sm">
-                                        We&apos;re waiting for the Cardano network to index your transaction. 
-                                        It&apos;s normal to see a few &quot;Not Found&quot; errors in the background during the first 20-40 seconds. 
-                                        Please stay on this page.
-                                    </p>
-                                    <div className="mt-4 flex items-center gap-3">
-                                        <span className="w-5 h-5 border-2 border-yellow-800 border-t-transparent rounded-full animate-spin"></span>
-                                        <span className="text-yellow-800 font-medium">Indexing on-chain...</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {showWalletModal && (
-                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h2 className="text-xl font-bold text-gray-900">Select Wallet</h2>
-                                            <button
-                                                onClick={() => setShowWalletModal(false)}
-                                                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-
-                                        {availableWallets.length === 0 ? (
-                                            <p className="text-gray-500 text-center py-4">No wallets detected</p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {availableWallets.map((w) => (
-                                                    <button
-                                                        key={w}
-                                                        onClick={() => {
-                                                            console.log(w);
-                                                            connectWallet(w);
-                                                            setShowWalletModal(false);
-                                                        }}
-                                                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition"
-                                                    >
-                                                        <span className="font-medium text-gray-800">{w}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            {showWalletModal &&
+                                <WalletModal
+                                    availableWallets={availableWallets}
+                                    onClose={() => setShowWalletModal(false)}
+                                    onSelectWallet={(walletName) => {
+                                        connect(walletName);
+                                    }}
+                                />
+                            }
 
 
                             <div className="space-y-4">

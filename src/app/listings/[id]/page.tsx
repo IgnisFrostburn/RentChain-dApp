@@ -7,6 +7,6 @@ interface PropertyDetailPageProps {
 
 export default async function PropertyDetailPage({ params }: PropertyDetailPageProps) {
     const { id } = await params;
-    const property = properties.find((p) => p.id === parseInt(id));
+    const property = properties.find((p) => p.id === Number.parseInt(id));
     return <PropertyDetail property={property} />;
 }
