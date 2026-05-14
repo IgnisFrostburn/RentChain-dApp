@@ -1,13 +1,18 @@
 import { BlockfrostProvider, MeshTxBuilder } from "@meshsdk/core";
 import { MeshCardanoBrowserWallet } from "@meshsdk/wallet";
-const apiKey = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
 
-if (!apiKey) throw new Error("Blockfrost API key error");
-
-const provider = new BlockfrostProvider(apiKey);
+const getProvider = () => {
+    const apiKey = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
+    if (!apiKey) {
+        throw new Error("Blockfrost API key is missing. Please set NEXT_PUBLIC_BLOCKFROST_PROJECT_ID in your .env file.");
+    }
+    return new BlockfrostProvider(apiKey);
+};
 
 export const waitForTransaction = async (txHash: string, maxAttempts = 20, interval = 5000): Promise<boolean> => {
     console.log(`Polling for transaction: ${txHash}...`);
+    
+    const provider = getProvider();
     
     // Initial delay: Give the network/Blockfrost a head start (10s)
     await new Promise((resolve) => setTimeout(resolve, 10000));
@@ -36,6 +41,7 @@ export const sendLovelace = async (
     recipientAddress: string,
     recipientAmount: string
 ): Promise<string> => {
+    const provider = getProvider();
     const txBuilder = new MeshTxBuilder({
         fetcher: provider,
         verbose: true,
