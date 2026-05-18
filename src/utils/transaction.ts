@@ -1,20 +1,53 @@
 import { BlockfrostProvider, MeshTxBuilder } from "@meshsdk/core";
 import { MeshCardanoBrowserWallet } from "@meshsdk/wallet";
-const apiKey = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
+import { supabase } from "@/lib/supabase";
 
-if (!apiKey) throw new Error("Blockfrost API key error");
+const getProvider = () => {
+    const apiKey = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
+    if (!apiKey) {
+        throw new Error("Blockfrost API key is missing. Please set NEXT_PUBLIC_BLOCKFROST_PROJECT_ID in your .env file.");
+    }
+    return new BlockfrostProvider(apiKey);
+};
 
-const provider = new BlockfrostProvider(apiKey);
-const txBuilder = new MeshTxBuilder({
-    fetcher: provider,
-    verbose: true,
-});
+export const waitForTransaction = async (txHash: string, maxAttempts = 20, interval = 5000): Promise<boolean> => {
+    console.log(`Polling for transaction: ${txHash}...`);
+
+    const provider = getProvider();
+
+    // Initial delay: Give the network/Blockfrost a head start (10s)
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    for (let i = 0; i < maxAttempts; i++) {
+        try {
+            const txInfo = await provider.fetchTxInfo(txHash);
+            if (txInfo) {
+                console.log("Transaction found and confirmed!");
+                return true;
+            }
+        } catch (error: any) {
+            if (error?.status === 404 || error?.message?.includes('404')) {
+                console.log(`Transaction not yet indexed (Attempt ${i + 1}/${maxAttempts})...`);
+            } else {
+                console.log("Unexpected error while fetching transaction info:", error);
+            }
+        }
+        await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    return false;
+};
 
 export const sendLovelace = async (
     wallet: MeshCardanoBrowserWallet,
     recipientAddress: string,
     recipientAmount: string
 ): Promise<string> => {
+    const provider = getProvider();
+    const txBuilder = new MeshTxBuilder({
+        fetcher: provider,
+        verbose: true,
+    });
+
     const utxos = await (wallet.getUtxosMesh());
     const changeAddress = await wallet.getChangeAddressBech32();
 
@@ -35,6 +68,24 @@ export const sendLovelace = async (
     const signedTx = await wallet.signTxReturnFullTx(unsignedTx);
     const txHash = await wallet.submitTx(signedTx);
 
+    const { error } = await supabase
+        .from('transactions')
+        .insert({
+            tx_hash: txHash,
+            status: 'pending'
+        });
+
+    if (error) {
+        console.error('Failed to save transaction:', error);
+    }
+
+    await fetch("/api/transactions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tx_hash: txHash }),
+    });
 
     return txHash;
 }

@@ -1,149 +1,280 @@
-'use client';
+"use client";
 
-import Navbar from '@/components/Navbar';
-import { FormEvent } from 'react';
-import { getAvailableWallets, connectWallet } from '@/utils/walletUtils';
-import { MeshCardanoBrowserWallet } from '@meshsdk/wallet';
-import { useEffect, useState } from 'react';
-import WalletModal from '@/components/WalletModal';
+import Navbar from "@/components/Navbar";
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+	CardDescription,
+} from "@/components/ui/Card";
+import { Label } from "@/components/ui/Label";
+import { useWallet } from "@/contexts/WalletContext";
+import {
+	MapPin,
+	Coins,
+	Info,
+	ArrowRight,
+	Activity,
+	Terminal,
+	Wallet2,
+} from "lucide-react";
 
 export default function ListPropertyPage() {
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-    };
+	const router = useRouter();
+	const { connectedWalletName, walletAddress, setShowWalletModal } =
+		useWallet();
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [wallet, setWallet] = useState<MeshCardanoBrowserWallet | null>(null);
-    const [availableWallets, setAvailableWallets] = useState<string[]>([]);
-    const [showWalletModal, setShowWalletModal] = useState(false);
-    const [usedAddress, setUsedAddress] = useState("");
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
 
-    const connect = async (walletName: string) => {
-        const wallet = await connectWallet(walletName);
-        setWallet(wallet);
-        const addresses = await wallet?.getUsedAddressesBech32()
-        setUsedAddress(addresses?.[0] || "");
-        console.log("Connected wallet with main address:", addresses?.[0]);
-    }
+		if (!connectedWalletName) {
+			setShowWalletModal(true);
+			return;
+		}
 
-    useEffect(() => {
-        const wallets = getAvailableWallets();
-        setAvailableWallets(wallets);
-    }, []);
+		setIsSubmitting(true);
 
-    return (
-        <>
-            <Navbar />
-            <main className="min-h-screen bg-gray-50">
-                <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-8">List Your Property</h1>
+		const formData = new FormData(e.currentTarget);
+		const title = formData.get("title") as string;
+		const location = formData.get("location") as string;
+		const rentADA = parseInt(formData.get("rent") as string);
+		const depositADA = parseInt(formData.get("deposit") as string);
+		const description = formData.get("description") as string;
 
-                    <div className="bg-white rounded-lg shadow-lg p-8">
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div>
-                                <label htmlFor="title" className="block text-sm font-medium text-gray-900 mb-2">
-                                    Property Title
-                                </label>
-                                <input
-                                    type="text"
-                                    id="title"
-                                    placeholder="e.g., Studio in Downtown"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                />
-                            </div>
+		// Use the connected wallet address as the landlord address
+		const landlordAddress =
+			walletAddress ||
+			"addr_test1vph779m96nxjd3s28t8eeqkt4e2x4gsfkrmszpty4qylxsggdze6w";
 
-                            <div>
-                                <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-2">
-                                    Description
-                                </label>
-                                <textarea
-                                    id="description"
-                                    rows={4}
-                                    placeholder="Describe your property..."
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                ></textarea>
-                            </div>
+		const newProperty = {
+			id: Date.now(), // Unique ID
+			title,
+			location,
+			rentADA,
+			depositADA,
+			description,
+			status: "Available",
+			landlordAddress,
+		};
 
-                            <div>
-                                <label htmlFor="location" className="block text-sm font-medium text-gray-900 mb-2">
-                                    Location
-                                </label>
-                                <input
-                                    type="text"
-                                    id="location"
-                                    placeholder="e.g., Cebu City, Philippines"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                />
-                            </div>
+		try {
+			// Simulate network delay
+			await new Promise((resolve) => setTimeout(resolve, 1500));
 
-                            <div>
-                                <label htmlFor="rent" className="block text-sm font-medium text-gray-900 mb-2">
-                                    Rent Amount (ADA)
-                                </label>
-                                <input
-                                    type="number"
-                                    id="rent"
-                                    placeholder="e.g., 200"
-                                    step="0.01"
-                                    min="0"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                />
-                            </div>
+			// Save to localStorage
+			const mintedProperties = JSON.parse(
+				localStorage.getItem("mintedProperties") || "[]",
+			);
+			mintedProperties.push(newProperty);
+			localStorage.setItem(
+				"mintedProperties",
+				JSON.stringify(mintedProperties),
+			);
 
-                            <div>
-                                <label htmlFor="deposit" className="block text-sm font-medium text-gray-900 mb-2">
-                                    Deposit Amount (ADA)
-                                </label>
-                                <input
-                                    type="number"
-                                    id="deposit"
-                                    placeholder="e.g., 400"
-                                    step="0.01"
-                                    min="0"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                />
-                            </div>
+			alert("Property successfully initialized on the protocol!");
+			router.push("/listings");
+		} catch (error) {
+			console.error("Error minting property:", error);
+			alert("Error initializing property. Please try again.");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
 
-                            <div>
-                                <label htmlFor="address" className="block text-sm font-medium text-gray-900 mb-2">
-                                    Landlord Wallet Address
-                                </label>
-                                <input
-                                    type="text"
-                                    id="address"
-                                    placeholder="e.g., addr1..."
-                                    disabled
-                                    value={usedAddress}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-not-allowed bg-gray-100"
-                                />
-                            </div>
+	return (
+		<div className="min-h-screen bg-[#030303] text-white crypto-grid">
+			<Navbar />
 
-                            {showWalletModal &&
-                                <WalletModal
-                                    availableWallets={availableWallets}
-                                    onClose={() => setShowWalletModal(false)}
-                                    onSelectWallet={(walletName) => {
-                                        connect(walletName);
-                                    }}
-                                />
-                            }
+			<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-32">
+				<div className="flex flex-col lg:flex-row gap-24 items-start">
+					{/* Protocol Info */}
+					<div className="flex-1 space-y-12">
+						<div className="space-y-6">
+							<div className="flex items-center gap-2 text-blue-500 font-black tracking-widest text-[10px] uppercase">
+								<Terminal className="w-4 h-4" />
+								Protocol / Asset_Onboarding
+							</div>
+							<h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter uppercase leading-[0.85]">
+								MINT YOUR <br />
+								<span className="text-gradient">INVENTORY.</span>
+							</h1>
+							<p className="text-xl text-gray-500 font-bold max-w-xl leading-snug">
+								Transform physical property into a verifiable on-chain rental
+								asset. Join the decentralized economy.
+							</p>
+						</div>
 
-                            <button
-                                onClick={() => setShowWalletModal(true)}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"
-                            >
-                                Connect Wallet
-                            </button>
+						<div className="grid gap-8">
+							{[
+								{
+									icon: Activity,
+									title: "On-Chain Verification",
+									desc: "Every listing is hashed and anchored to the Cardano ledger for permanent validity.",
+								},
+								{
+									icon: Coins,
+									title: "Liquidity Streams",
+									desc: "Receive automated rental payments in ADA, settled instantly to your treasury address.",
+								},
+								{
+									icon: Info,
+									title: "Smart Escrow",
+									desc: "Security deposits are managed by the protocol, eliminating trust requirements.",
+								},
+							].map((item, i) => (
+								<div
+									key={i}
+									className="flex gap-6 group">
+									<div className="w-16 h-16 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+										<item.icon className="w-7 h-7" />
+									</div>
+									<div className="space-y-1">
+										<h4 className="text-xl font-black text-white uppercase tracking-tighter">
+											{item.title}
+										</h4>
+										<p className="text-gray-500 font-medium text-sm leading-relaxed">
+											{item.desc}
+										</p>
+									</div>
+								</div>
+							))}
+						</div>
+					</div>
 
-                            <button
-                                type="submit"
-                                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition"
-                            >
-                                Submit Listing
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </>
-    );
+					{/* Onboarding Form */}
+					<div className="flex-1 w-full">
+						<div className="relative">
+							<div className="absolute inset-0 bg-blue-600/10 blur-[100px] rounded-full" />
+							<Card className="relative rounded-[3rem] border-white/10 bg-[#0a0a0a] overflow-hidden shadow-2xl">
+								<CardHeader className="p-12 pb-0">
+									<CardTitle className="text-3xl font-black uppercase tracking-tighter">
+										Asset Metadata
+									</CardTitle>
+									<CardDescription className="text-gray-500 font-bold">
+										Input the technical parameters for the new asset node.
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="p-12 space-y-10">
+									<form
+										onSubmit={handleSubmit}
+										className="space-y-8">
+										<div className="space-y-3">
+											<Label
+												htmlFor="title"
+												className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">
+												Protocol Title
+											</Label>
+											<Input
+												id="title"
+												name="title"
+												required
+												placeholder="PH_CEBU_STUDIO_01"
+												className="h-14 rounded-2xl border-white/5 bg-white/[0.03] text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
+											/>
+										</div>
+
+										<div className="space-y-3">
+											<Label
+												htmlFor="location"
+												className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">
+												Geospatial Data
+											</Label>
+											<div className="relative">
+												<MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700" />
+												<Input
+													id="location"
+													name="location"
+													required
+													placeholder="Coordinate or Address"
+													className="h-14 pl-12 rounded-2xl border-white/5 bg-white/[0.03] text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
+												/>
+											</div>
+										</div>
+
+										<div className="grid grid-cols-2 gap-6">
+											<div className="space-y-3">
+												<Label
+													htmlFor="rent"
+													className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">
+													Rent_ADA
+												</Label>
+												<Input
+													id="rent"
+													name="rent"
+													type="number"
+													required
+													placeholder="0.00"
+													className="h-14 rounded-2xl border-white/5 bg-white/[0.03] text-white font-black focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
+												/>
+											</div>
+											<div className="space-y-3">
+												<Label
+													htmlFor="deposit"
+													className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">
+													Bond_ADA
+												</Label>
+												<Input
+													id="deposit"
+													name="deposit"
+													type="number"
+													required
+													placeholder="0.00"
+													className="h-14 rounded-2xl border-white/5 bg-white/[0.03] text-white font-black focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
+												/>
+											</div>
+										</div>
+
+										<div className="space-y-3">
+											<Label
+												htmlFor="description"
+												className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 ml-1">
+												Node Description
+											</Label>
+											<Textarea
+												id="description"
+												name="description"
+												required
+												placeholder="Define asset amenities and parameters..."
+												rows={4}
+												className="rounded-2xl border-white/5 bg-white/[0.03] text-white font-bold focus:border-blue-500/50 focus:ring-blue-500/10 transition-all placeholder:text-gray-800"
+											/>
+										</div>
+
+										<Button
+											type="submit"
+											disabled={isSubmitting}
+											className="w-full h-20 rounded-[2rem] bg-white text-black text-xl font-black hover:bg-blue-600 hover:text-white transition-all shadow-xl active:scale-95 group disabled:opacity-50">
+											{!connectedWalletName ? (
+												<span className="flex items-center gap-3 uppercase">
+													<Wallet2 className="w-6 h-6" />
+													Initialize Wallet
+												</span>
+											) : isSubmitting ? (
+												<span className="flex items-center gap-3">
+													<div className="w-5 h-5 border-2 border-gray-500 border-t-black rounded-full animate-spin" />
+													INITIALIZING...
+												</span>
+											) : (
+												<span className="flex items-center gap-3">
+													Initialize Asset Node
+													<ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
+												</span>
+											)}
+										</Button>
+									</form>
+								</CardContent>
+							</Card>
+						</div>
+					</div>
+				</div>
+			</main>
+		</div>
+	);
 }

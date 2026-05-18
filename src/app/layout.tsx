@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { WalletProvider } from "@/contexts/WalletContext";
+import CronInitializer from "@/components/CronInitializer";
 
 const geist = Geist({
     variable: "--font-geist-sans",
@@ -27,7 +29,8 @@ export default function RootLayout({
             <body
                 className={`${geist.variable} ${geistMono.variable} antialiased`}
             >
-                {children}
+                <CronInitializer />
+                <WalletProvider>{children}</WalletProvider>
             </body>
         </html>
     );
