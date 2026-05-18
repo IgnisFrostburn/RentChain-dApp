@@ -1,6 +1,73 @@
+@import "leaflet/dist/leaflet.css";
+@import "leaflet-geosearch/dist/geosearch.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom Map Styles */
+.leaflet-container {
+  background: #030303 !important;
+  font-family: inherit !important;
+  z-index: 10 !important;
+}
+
+.leaflet-control-geosearch form {
+  background-color: #0a0a0a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-control-geosearch form input {
+  background-color: transparent !important;
+  color: white !important;
+  font-family: inherit !important;
+  font-weight: 600 !important;
+}
+
+.leaflet-control-geosearch a.reset {
+  display: none !important;
+}
+
+.leaflet-control-geosearch .results {
+  background-color: #0a0a0a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  margin-top: 8px !important;
+  color: white !important;
+}
+
+.leaflet-control-geosearch .results > div {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 10px 15px !important;
+}
+
+.leaflet-control-geosearch .results > div:hover {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  color: #3b82f6 !important;
+}
+
+.leaflet-bar a {
+  background-color: #0a0a0a !important;
+  color: #666 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #1a1a1a !important;
+  color: white !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(0,0,0,0.5) !important;
+  backdrop-filter: blur(4px);
+  color: #444 !important;
+  font-size: 8px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #666 !important;
+}
 
 @layer base {
   :root {

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from 'next/dynamic';
 import Navbar from "./Navbar";
 import { sendLovelace, waitForTransaction } from "@/utils/transaction";
 import { Button } from "./ui/Button";
@@ -21,8 +22,15 @@ import {
 	Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Property } from "@/types/property";
 
-export default function PropertyDetail({ property }: { property: any }) {
+// Dynamically import Map to avoid SSR issues
+const Map = dynamic(() => import('@/components/Map'), { 
+    ssr: false,
+    loading: () => <div className="h-[400px] w-full bg-white/5 rounded-[3rem] animate-pulse flex items-center justify-center text-gray-500 font-bold uppercase tracking-widest text-xs">Loading Geospatial Engine...</div>
+});
+
+export default function PropertyDetail({ property }: { property: Property }) {
 	const { 
 		wallet, 
 		connectedWalletName, 
@@ -31,54 +39,70 @@ export default function PropertyDetail({ property }: { property: any }) {
 	} = useWallet();
 	const [isPending, setIsPending] = useState(false);
 	const [isConfirmed, setIsConfirmed] = useState(false);
+	const [isRentedByOthers, setIsRentedByOthers] = useState(false);
 	const [txHash, setTxHash] = useState<string | null>(null);
 
-	useEffect(() => {
-		if (!walletAddress) {
-			setIsConfirmed(false);
-			return;
-		}
+	const isLandlord = !!(walletAddress && property?.landlordAddress && 
+					  walletAddress.toLowerCase() === property?.landlordAddress?.toLowerCase());
 
-		// Check wallet-specific rentals
-		const rentedByWallet = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
-		
-		// Also check old global rentals for backward compatibility
-		const oldRentedIds = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
-		
-		if (property && (rentedByWallet.includes(property.id) || oldRentedIds.includes(property.id))) {
-			setIsConfirmed(true);
-		} else {
-			setIsConfirmed(false);
-		}
+	useEffect(() => {
+		const checkRentalStatus = async () => {
+			if (!property?.metadataIpfsHash) return;
+
+			try {
+				// Fetch all rented CIDs from the blockchain via our API
+				const response = await fetch('/api/rentals');
+				if (response.ok) {
+					const rentedCIDs = await response.json();
+					const isRentedOnChain = rentedCIDs.includes(property.metadataIpfsHash);
+					
+					// If it's rented on chain, we need to know if it was by US or OTHERS
+					if (isRentedOnChain) {
+						// For demo purposes, we'll check our own history to see if WE were the ones who rented it
+						// In a real app, we'd scan for transactions specifically from OUR address to this CID
+						const myRentals = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
+						if (myRentals.includes(property.id) || myRentals.includes(property.metadataIpfsHash)) {
+							setIsConfirmed(true);
+						} else {
+							setIsRentedByOthers(true);
+						}
+					}
+				}
+			} catch (error) {
+				console.error("Error checking rental status:", error);
+			}
+		};
+
+		checkRentalStatus();
 	}, [property, walletAddress]);
 
 	const handlePayment = async () => {
 		if (!wallet || !property || !walletAddress) return;
+		
+		// Guard: Already rented
+		if (isRentedByOthers || property.status === "Rented") {
+			alert("This property is already rented.");
+			return;
+		}
+
 		try {
 			setIsPending(true);
+			// Pass metadataCID to link this payment to the property on-chain
 			const hash = await sendLovelace(
 				wallet,
 				property.landlordAddress,
 				(property.depositADA * 1000000).toString(),
+				property.metadataIpfsHash
 			);
 			setTxHash(hash);
 			const confirmed = await waitForTransaction(hash);
 			if (confirmed) {
 				setIsConfirmed(true);
 				
-				// Save to wallet-specific storage
+				// Optional: Local secondary tracking for immediate UI response
 				const rentedByWallet = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
-				if (!rentedByWallet.includes(property.id)) {
-					rentedByWallet.push(property.id);
-					localStorage.setItem(`rentedProperties_${walletAddress}`, JSON.stringify(rentedByWallet));
-				}
-
-				// Also update legacy storage for safety
-				const oldRentedIds = JSON.parse(localStorage.getItem("rentedProperties") || "[]");
-				if (!oldRentedIds.includes(property.id)) {
-					oldRentedIds.push(property.id);
-					localStorage.setItem("rentedProperties", JSON.stringify(oldRentedIds));
-				}
+				rentedByWallet.push(property.metadataIpfsHash || property.id);
+				localStorage.setItem(`rentedProperties_${walletAddress}`, JSON.stringify(rentedByWallet));
 			} else {
 				alert("Transaction submission timed out. Please check your wallet.");
 			}
@@ -91,6 +115,7 @@ export default function PropertyDetail({ property }: { property: any }) {
 	};
 
 	if (!property) {
+		console.error("[PropertyDetail Component] No property data received. Rendering 'Asset Not Found' UI.");
 		return (
 			<div className="min-h-screen bg-[#030303] text-white flex items-center justify-center">
 				<div className="text-center space-y-4">
@@ -146,8 +171,18 @@ export default function PropertyDetail({ property }: { property: any }) {
 
 						{/* Interactive Visual Element */}
 						<div className="aspect-[21/9] rounded-[3rem] bg-[#0a0a0a] border border-white/5 relative overflow-hidden group shadow-2xl">
-							<div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-purple-900/20 group-hover:scale-105 transition-transform duration-1000" />
-							<div className="absolute inset-0 crypto-grid opacity-20" />
+							{property.imageIpfsHash ? (
+								<img 
+									src={`https://ipfs.io/ipfs/${property.imageIpfsHash}`} 
+									alt={property.title}
+									className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+								/>
+							) : (
+								<>
+									<div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-purple-900/20 group-hover:scale-105 transition-transform duration-1000" />
+									<div className="absolute inset-0 crypto-grid opacity-20" />
+								</>
+							)}
 
 							<div className="absolute top-10 left-10 space-y-4">
 								<Boxes className="w-12 h-12 text-blue-500/50" />
@@ -156,20 +191,46 @@ export default function PropertyDetail({ property }: { property: any }) {
 										Lease Contract V2.1
 									</p>
 									<p className="text-white font-mono text-xs">
-										HASH: 9a2f...110e
+										HASH: 9a2f...{property.imageIpfsHash ? property.imageIpfsHash.substring(0, 4) : '110e'}
 									</p>
 								</div>
-							</div>
-
-							<div className="absolute bottom-10 right-10 text-right">
-								<p className="text-4xl font-black text-white leading-none">
-									PREMIUM <br /> UNIT
-								</p>
-								<p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">
-									Inventory #00{property.id}
-								</p>
+								{property.metadataIpfsHash && (
+									<a 
+										href={`https://ipfs.io/ipfs/${property.metadataIpfsHash}`} 
+										target="_blank" 
+										rel="noopener noreferrer"
+										className="p-4 glass rounded-2xl border-white/5 space-y-1 block hover:bg-white/5 transition-colors"
+									>
+										<p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
+											Decentralized Metadata
+										</p>
+										<p className="text-white font-mono text-xs line-clamp-1">
+											CID: {property.metadataIpfsHash}
+										</p>
+									</a>
+								)}
 							</div>
 						</div>
+
+						<section className="space-y-8">
+							<div className="flex items-center justify-between">
+								<h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+									Geospatial Context
+								</h2>
+								<div className="flex items-center gap-2 text-blue-500 font-black text-[10px] uppercase tracking-widest bg-blue-500/10 px-4 py-2 rounded-full border border-blue-500/20">
+									<MapPin className="w-3 h-3" />
+									Live Asset Coordinates
+								</div>
+							</div>
+							
+							<div className="h-[400px] w-full rounded-[3rem] border border-white/5 shadow-2xl">
+								<Map 
+									interactive={false} 
+									location={property.lat && property.lng ? [property.lat, property.lng] : undefined}
+									zoom={15}
+								/>
+							</div>
+						</section>
 
 						<section className="space-y-8">
 							<h2 className="text-4xl font-black text-white tracking-tighter uppercase">
@@ -181,14 +242,14 @@ export default function PropertyDetail({ property }: { property: any }) {
 
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t border-white/5">
 								{[
-									{ label: "Type", value: "Residential", icon: Terminal },
+									{ label: "Type", value: property.propertyType || "Residential", icon: Terminal },
 									{ label: "Network", value: "Cardano", icon: Cpu },
 									{
 										label: "Identity",
 										value: "KYC Verified",
 										icon: Fingerprint,
 									},
-									{ label: "Term", value: "6-12 Mo", icon: Clock },
+									{ label: "Term", value: property.leaseTerm || "6-12 Mo", icon: Clock },
 								].map((spec, i) => (
 									<div
 										key={i}
@@ -330,11 +391,11 @@ export default function PropertyDetail({ property }: { property: any }) {
 													</div>
 
 													<Button
-														disabled={isPending}
+														disabled={isPending || isRentedByOthers || isLandlord}
 														onClick={handlePayment}
 														className={cn(
 															"w-full h-20 rounded-[2rem] text-xl font-black transition-all",
-															isPending
+															isPending || isRentedByOthers || isLandlord
 																? "bg-white/5 text-gray-500 cursor-not-allowed"
 																: "bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_40px_rgba(37,99,235,0.3)]",
 														)}>
@@ -342,6 +403,14 @@ export default function PropertyDetail({ property }: { property: any }) {
 															<span className="flex items-center gap-3">
 																<div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
 																EXECUTING...
+															</span>
+														) : isLandlord ? (
+															<span className="flex items-center gap-3 uppercase">
+																You Own This Asset
+															</span>
+														) : isRentedByOthers ? (
+															<span className="flex items-center gap-3 uppercase">
+																Property Rented
 															</span>
 														) : (
 															<span className="flex items-center gap-3">
