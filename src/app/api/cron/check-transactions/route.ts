@@ -1,8 +1,8 @@
 import { supabase } from "@/lib/supabase";
-import { BlockfrostProvider } from "@meshsdk/core";
+// import { BlockfrostProvider } from "@meshsdk/core";
 
 const apiKey = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
-const provider = new BlockfrostProvider(apiKey!);
+// const provider = new BlockfrostProvider(apiKey!);
 
 export async function GET() {
 	try {

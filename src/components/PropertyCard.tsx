@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { MapPin, ArrowUpRight, Coins } from 'lucide-react';
+import { useWallet } from '@/contexts/WalletContext';
 
 interface PropertyCardProps {
     id: number;
@@ -13,6 +14,9 @@ interface PropertyCardProps {
     rentADA: number;
     depositADA: number;
     status: 'Available' | 'Rented';
+    imageIpfsHash?: string;
+    metadataIpfsHash?: string;
+    landlordAddress?: string;
 }
 
 export default function PropertyCard({
@@ -22,14 +26,28 @@ export default function PropertyCard({
     rentADA,
     depositADA,
     status,
+    imageIpfsHash,
+    landlordAddress,
 }: PropertyCardProps) {
+    const { walletAddress } = useWallet();
+    const isLandlord = walletAddress && landlordAddress && 
+                      walletAddress.toLowerCase() === landlordAddress.toLowerCase();
+
     return (
         <Card className="group overflow-hidden border-white/5 bg-white/5 backdrop-blur-xl hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.2)] transition-all duration-500 rounded-[2rem]">
             <div className="relative h-56 w-full bg-[#0a0a0a] overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 group-hover:scale-110 transition-transform duration-700" />
-                
-                {/* Visual Placeholder Pattern */}
-                <div className="absolute inset-0 crypto-grid opacity-30" />
+                {imageIpfsHash ? (
+                    <img 
+                        src={`https://ipfs.io/ipfs/${imageIpfsHash}`} 
+                        alt={title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                ) : (
+                    <>
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 group-hover:scale-110 transition-transform duration-700" />
+                        <div className="absolute inset-0 crypto-grid opacity-30" />
+                    </>
+                )}
                 
                 <div className="absolute top-4 left-4 z-10">
                     <Badge variant={status === 'Available' ? 'success' : 'warning'} className="bg-black/60 backdrop-blur-md border-white/10 font-black px-4 py-1 text-[10px] tracking-widest uppercase">
@@ -71,7 +89,7 @@ export default function PropertyCard({
             <CardFooter className="p-6 pt-0">
                 <Link href={`/listings/${id}`} className="w-full">
                     <Button className="w-full h-12 bg-white text-black hover:bg-blue-500 hover:text-white rounded-xl font-black transition-all active:scale-95">
-                        Inspect Lease
+                        {isLandlord ? 'Manage Lease' : 'Inspect Lease'}
                     </Button>
                 </Link>
             </CardFooter>
