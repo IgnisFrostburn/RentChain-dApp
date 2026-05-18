@@ -57,10 +57,12 @@ export default function PropertyDetail({ property }: { property: Property }) {
 		if (!property?.id || !walletAddress) return;
 
 		const checkPersistentTx = async () => {
-			const savedTx = localStorage.getItem(`pendingTx_${property.id}_${walletAddress}`);
+			const savedTx = localStorage.getItem(
+				`pendingTx_${property.id}_${walletAddress}`,
+			);
 			if (savedTx) {
 				console.log(`[PropertyDetail] Found saved tx hash: ${savedTx}`);
-				
+
 				// 1. Immediately restore the UI to "Syncing" state
 				setTxHash(savedTx);
 				setIsSubmitted(true);
@@ -74,11 +76,16 @@ export default function PropertyDetail({ property }: { property: Property }) {
 					.single();
 
 				if (error) {
-					console.warn("[PropertyDetail] Could not verify status with DB (maybe RLS policy). Keeping pending state.", error.message);
+					console.warn(
+						"[PropertyDetail] Could not verify status with DB (maybe RLS policy). Keeping pending state.",
+						error.message,
+					);
 				} else if (data) {
 					if (data.status === "confirmed") {
 						setIsConfirmed(true);
-						localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+						localStorage.removeItem(
+							`pendingTx_${property.id}_${walletAddress}`,
+						);
 					} else if (data.status === "failed") {
 						setTxStatus("failed");
 					} else {
@@ -93,7 +100,7 @@ export default function PropertyDetail({ property }: { property: Property }) {
 
 	// Real-time listener for transaction status updates from the cron job
 	useEffect(() => {
-		if (!txHash) return;
+		if (!txHash || isConfirmed) return;
 
 		console.log(`[PropertyDetail] Subscribing to updates for tx: ${txHash}`);
 		const channel = supabase
@@ -112,10 +119,12 @@ export default function PropertyDetail({ property }: { property: Property }) {
 						payload.new.status,
 					);
 					setTxStatus(payload.new.status);
-					
+
 					if (payload.new.status === "confirmed") {
 						setIsConfirmed(true);
-						localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+						localStorage.removeItem(
+							`pendingTx_${property.id}_${walletAddress}`,
+						);
 
 						// Local tracking for UI consistency
 						const rentedByWallet = JSON.parse(
@@ -131,16 +140,43 @@ export default function PropertyDetail({ property }: { property: Property }) {
 							);
 						}
 					} else if (payload.new.status === "failed") {
-						localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+						localStorage.removeItem(
+							`pendingTx_${property.id}_${walletAddress}`,
+						);
 					}
 				},
 			)
 			.subscribe();
 
+		// Fallback Polling (Every 15s) in case Realtime is blocked or fails
+		const interval = setInterval(async () => {
+			if (isConfirmed) return;
+
+			console.log("[PropertyDetail] Fallback status check...");
+			const { data } = await supabase
+				.from("transactions")
+				.select("status")
+				.eq("tx_hash", txHash)
+				.single();
+
+			if (data) {
+				setTxStatus(data.status);
+				if (data.status === "confirmed") {
+					setIsConfirmed(true);
+					localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+					clearInterval(interval);
+				} else if (data.status === "failed") {
+					localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+					clearInterval(interval);
+				}
+			}
+		}, 10000);
+
 		return () => {
 			supabase.removeChannel(channel);
+			clearInterval(interval);
 		};
-	}, [txHash, walletAddress, property]);
+	}, [txHash, walletAddress, property, isConfirmed]);
 
 	useEffect(() => {
 		const checkRentalStatus = async () => {
@@ -200,10 +236,10 @@ export default function PropertyDetail({ property }: { property: Property }) {
 			);
 
 			console.log("[PropertyDetail] Transaction submitted:", hash);
-			
+
 			// Persist txHash locally so it survives refresh
 			localStorage.setItem(`pendingTx_${property.id}_${walletAddress}`, hash);
-			
+
 			setTxHash(hash);
 			setIsSubmitted(true);
 			setTxStatus("pending");
