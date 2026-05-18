@@ -84,7 +84,7 @@ export const sendLovelace = async (
 	const signedTx = await wallet.signTxReturnFullTx(unsignedTx);
 	const txHash = await wallet.submitTx(signedTx);
 
-	// Log transaction to Supabase and API after submission
+	// Log transaction to Supabase after submission
 	try {
 		const { error } = await supabase.from("transactions").insert({
 			tx_hash: txHash,
@@ -94,14 +94,6 @@ export const sendLovelace = async (
 		if (error) {
 			console.error("Failed to save transaction to Supabase:", error);
 		}
-
-		await fetch("/api/transactions", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({ tx_hash: txHash }),
-		});
 	} catch (logError) {
 		console.error("Error in post-transaction tracking:", logError);
 	}

@@ -1,13 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 import Navbar from "./Navbar";
-import { sendLovelace, waitForTransaction } from "@/utils/transaction";
+import { sendLovelace } from "@/utils/transaction";
 import { Button } from "./ui/Button";
 import { Card, CardContent } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 import { useWallet } from "@/contexts/WalletContext";
+import { supabase } from "@/lib/supabase";
 import {
 	ChevronLeft,
 	MapPin,
@@ -23,27 +24,123 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Property } from "@/types/property";
+import { getIpfsUrl } from "@/utils/ipfs";
 
 // Dynamically import Map to avoid SSR issues
-const Map = dynamic(() => import('@/components/Map'), { 
-    ssr: false,
-    loading: () => <div className="h-[400px] w-full bg-white/5 rounded-[3rem] animate-pulse flex items-center justify-center text-gray-500 font-bold uppercase tracking-widest text-xs">Loading Geospatial Engine...</div>
+const Map = dynamic(() => import("@/components/Map"), {
+	ssr: false,
+	loading: () => (
+		<div className="h-[400px] w-full bg-white/5 rounded-[3rem] animate-pulse flex items-center justify-center text-gray-500 font-bold uppercase tracking-widest text-xs">
+			Loading Geospatial Engine...
+		</div>
+	),
 });
 
 export default function PropertyDetail({ property }: { property: Property }) {
-	const { 
-		wallet, 
-		connectedWalletName, 
-		walletAddress,
-		setShowWalletModal 
-	} = useWallet();
+	const { wallet, connectedWalletName, walletAddress, setShowWalletModal } =
+		useWallet();
 	const [isPending, setIsPending] = useState(false);
+	const [isSubmitted, setIsSubmitted] = useState(false);
+	const [txStatus, setTxStatus] = useState<string>("pending");
 	const [isConfirmed, setIsConfirmed] = useState(false);
 	const [isRentedByOthers, setIsRentedByOthers] = useState(false);
 	const [txHash, setTxHash] = useState<string | null>(null);
 
-	const isLandlord = !!(walletAddress && property?.landlordAddress && 
-					  walletAddress.toLowerCase() === property?.landlordAddress?.toLowerCase());
+	const isLandlord = !!(
+		walletAddress &&
+		property?.landlordAddress &&
+		walletAddress.toLowerCase() === property?.landlordAddress?.toLowerCase()
+	);
+
+	// Check for existing pending transaction on mount
+	useEffect(() => {
+		if (!property?.id || !walletAddress) return;
+
+		const checkPersistentTx = async () => {
+			const savedTx = localStorage.getItem(`pendingTx_${property.id}_${walletAddress}`);
+			if (savedTx) {
+				console.log(`[PropertyDetail] Found saved tx hash: ${savedTx}`);
+				
+				// 1. Immediately restore the UI to "Syncing" state
+				setTxHash(savedTx);
+				setIsSubmitted(true);
+				setTxStatus("pending");
+
+				// 2. Verify status with Supabase in the background
+				const { data, error } = await supabase
+					.from("transactions")
+					.select("status")
+					.eq("tx_hash", savedTx)
+					.single();
+
+				if (error) {
+					console.warn("[PropertyDetail] Could not verify status with DB (maybe RLS policy). Keeping pending state.", error.message);
+				} else if (data) {
+					if (data.status === "confirmed") {
+						setIsConfirmed(true);
+						localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+					} else if (data.status === "failed") {
+						setTxStatus("failed");
+					} else {
+						setTxStatus("pending");
+					}
+				}
+			}
+		};
+
+		checkPersistentTx();
+	}, [property, walletAddress]);
+
+	// Real-time listener for transaction status updates from the cron job
+	useEffect(() => {
+		if (!txHash) return;
+
+		console.log(`[PropertyDetail] Subscribing to updates for tx: ${txHash}`);
+		const channel = supabase
+			.channel(`tx-status-${txHash}`)
+			.on(
+				"postgres_changes",
+				{
+					event: "UPDATE",
+					schema: "public",
+					table: "transactions",
+					filter: `tx_hash=eq.${txHash}`,
+				},
+				(payload) => {
+					console.log(
+						"[PropertyDetail] Status update received:",
+						payload.new.status,
+					);
+					setTxStatus(payload.new.status);
+					
+					if (payload.new.status === "confirmed") {
+						setIsConfirmed(true);
+						localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+
+						// Local tracking for UI consistency
+						const rentedByWallet = JSON.parse(
+							localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]",
+						);
+						if (
+							!rentedByWallet.includes(property.metadataIpfsHash || property.id)
+						) {
+							rentedByWallet.push(property.metadataIpfsHash || property.id);
+							localStorage.setItem(
+								`rentedProperties_${walletAddress}`,
+								JSON.stringify(rentedByWallet),
+							);
+						}
+					} else if (payload.new.status === "failed") {
+						localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
+					}
+				},
+			)
+			.subscribe();
+
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [txHash, walletAddress, property]);
 
 	useEffect(() => {
 		const checkRentalStatus = async () => {
@@ -51,17 +148,24 @@ export default function PropertyDetail({ property }: { property: Property }) {
 
 			try {
 				// Fetch all rented CIDs from the blockchain via our API
-				const response = await fetch('/api/rentals');
+				const response = await fetch("/api/rentals");
 				if (response.ok) {
 					const rentedCIDs = await response.json();
-					const isRentedOnChain = rentedCIDs.includes(property.metadataIpfsHash);
-					
+					const isRentedOnChain = rentedCIDs.includes(
+						property.metadataIpfsHash,
+					);
+
 					// If it's rented on chain, we need to know if it was by US or OTHERS
 					if (isRentedOnChain) {
 						// For demo purposes, we'll check our own history to see if WE were the ones who rented it
 						// In a real app, we'd scan for transactions specifically from OUR address to this CID
-						const myRentals = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
-						if (myRentals.includes(property.id) || myRentals.includes(property.metadataIpfsHash)) {
+						const myRentals = JSON.parse(
+							localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]",
+						);
+						if (
+							myRentals.includes(property.id) ||
+							myRentals.includes(property.metadataIpfsHash)
+						) {
 							setIsConfirmed(true);
 						} else {
 							setIsRentedByOthers(true);
@@ -78,7 +182,7 @@ export default function PropertyDetail({ property }: { property: Property }) {
 
 	const handlePayment = async () => {
 		if (!wallet || !property || !walletAddress) return;
-		
+
 		// Guard: Already rented
 		if (isRentedByOthers || property.status === "Rented") {
 			alert("This property is already rented.");
@@ -92,20 +196,17 @@ export default function PropertyDetail({ property }: { property: Property }) {
 				wallet,
 				property.landlordAddress,
 				(property.depositADA * 1000000).toString(),
-				property.metadataIpfsHash
+				property.metadataIpfsHash,
 			);
+
+			console.log("[PropertyDetail] Transaction submitted:", hash);
+			
+			// Persist txHash locally so it survives refresh
+			localStorage.setItem(`pendingTx_${property.id}_${walletAddress}`, hash);
+			
 			setTxHash(hash);
-			const confirmed = await waitForTransaction(hash);
-			if (confirmed) {
-				setIsConfirmed(true);
-				
-				// Optional: Local secondary tracking for immediate UI response
-				const rentedByWallet = JSON.parse(localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]");
-				rentedByWallet.push(property.metadataIpfsHash || property.id);
-				localStorage.setItem(`rentedProperties_${walletAddress}`, JSON.stringify(rentedByWallet));
-			} else {
-				alert("Transaction submission timed out. Please check your wallet.");
-			}
+			setIsSubmitted(true);
+			setTxStatus("pending");
 		} catch (error) {
 			console.error("Payment error:", error);
 			alert("Error processing payment. See console for details.");
@@ -115,7 +216,9 @@ export default function PropertyDetail({ property }: { property: Property }) {
 	};
 
 	if (!property) {
-		console.error("[PropertyDetail Component] No property data received. Rendering 'Asset Not Found' UI.");
+		console.error(
+			"[PropertyDetail Component] No property data received. Rendering 'Asset Not Found' UI.",
+		);
 		return (
 			<div className="min-h-screen bg-[#030303] text-white flex items-center justify-center">
 				<div className="text-center space-y-4">
@@ -172,8 +275,8 @@ export default function PropertyDetail({ property }: { property: Property }) {
 						{/* Interactive Visual Element */}
 						<div className="aspect-[21/9] rounded-[3rem] bg-[#0a0a0a] border border-white/5 relative overflow-hidden group shadow-2xl">
 							{property.imageIpfsHash ? (
-								<img 
-									src={`https://ipfs.io/ipfs/${property.imageIpfsHash}`} 
+								<img
+									src={getIpfsUrl(property.imageIpfsHash)}
 									alt={property.title}
 									className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
 								/>
@@ -191,16 +294,18 @@ export default function PropertyDetail({ property }: { property: Property }) {
 										Lease Contract V2.1
 									</p>
 									<p className="text-white font-mono text-xs">
-										HASH: 9a2f...{property.imageIpfsHash ? property.imageIpfsHash.substring(0, 4) : '110e'}
+										HASH: 9a2f...
+										{property.imageIpfsHash
+											? property.imageIpfsHash.substring(0, 4)
+											: "110e"}
 									</p>
 								</div>
 								{property.metadataIpfsHash && (
-									<a 
-										href={`https://ipfs.io/ipfs/${property.metadataIpfsHash}`} 
-										target="_blank" 
+									<a
+										href={getIpfsUrl(property.metadataIpfsHash)}
+										target="_blank"
 										rel="noopener noreferrer"
-										className="p-4 glass rounded-2xl border-white/5 space-y-1 block hover:bg-white/5 transition-colors"
-									>
+										className="p-4 glass rounded-2xl border-white/5 space-y-1 block hover:bg-white/5 transition-colors">
 										<p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
 											Decentralized Metadata
 										</p>
@@ -222,11 +327,15 @@ export default function PropertyDetail({ property }: { property: Property }) {
 									Live Asset Coordinates
 								</div>
 							</div>
-							
+
 							<div className="h-[400px] w-full rounded-[3rem] border border-white/5 shadow-2xl">
-								<Map 
-									interactive={false} 
-									location={property.lat && property.lng ? [property.lat, property.lng] : undefined}
+								<Map
+									interactive={false}
+									location={
+										property.lat && property.lng
+											? [property.lat, property.lng]
+											: undefined
+									}
 									zoom={15}
 								/>
 							</div>
@@ -242,14 +351,22 @@ export default function PropertyDetail({ property }: { property: Property }) {
 
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t border-white/5">
 								{[
-									{ label: "Type", value: property.propertyType || "Residential", icon: Terminal },
+									{
+										label: "Type",
+										value: property.propertyType || "Residential",
+										icon: Terminal,
+									},
 									{ label: "Network", value: "Cardano", icon: Cpu },
 									{
 										label: "Identity",
 										value: "KYC Verified",
 										icon: Fingerprint,
 									},
-									{ label: "Term", value: property.leaseTerm || "6-12 Mo", icon: Clock },
+									{
+										label: "Term",
+										value: property.leaseTerm || "6-12 Mo",
+										icon: Clock,
+									},
 								].map((spec, i) => (
 									<div
 										key={i}
@@ -329,7 +446,7 @@ export default function PropertyDetail({ property }: { property: Property }) {
 
 									{isConfirmed ? (
 										<div className="space-y-6 animate-in zoom-in duration-500">
-											<div className="p-8 bg-emerald-500 text-black rounded-[2rem] text-center font-black">
+											<div className="p-8 bg-emerald-500 text-black rounded-[2rem] text-center font-black shadow-[0_0_30px_rgba(16,185,129,0.3)]">
 												<CheckCircle2 className="w-12 h-12 mx-auto mb-4" />
 												<p className="text-2xl tracking-tighter mb-1 uppercase">
 													LEASE_ACTIVATED
@@ -351,10 +468,66 @@ export default function PropertyDetail({ property }: { property: Property }) {
 											<Link
 												href="/my-rentals"
 												className="block">
-												<Button className="w-full h-16 rounded-2xl bg-white text-black font-black text-lg hover:bg-gray-200">
+												<Button className="w-full h-16 rounded-2xl bg-white text-black font-black text-lg hover:bg-gray-200 shadow-xl transition-all active:scale-95">
 													Open Dashboard
 												</Button>
 											</Link>
+										</div>
+									) : isSubmitted ? (
+										<div className="space-y-6 animate-in fade-in duration-500">
+											<div
+												className={cn(
+													"p-8 rounded-[2rem] text-center font-black border transition-all duration-500",
+													txStatus === "failed"
+														? "bg-red-500/10 border-red-500/50 text-red-500"
+														: "bg-blue-600/10 border-blue-500/30 text-blue-400",
+												)}>
+												{txStatus === "failed" ? (
+													<AlertCircle className="w-12 h-12 mx-auto mb-4" />
+												) : (
+													<Clock className="w-12 h-12 mx-auto mb-4 animate-pulse" />
+												)}
+												<p className="text-2xl tracking-tighter mb-1 uppercase">
+													{txStatus === "failed"
+														? "SYNC_FAILED"
+														: "SYNCING_LEDGER"}
+												</p>
+												<p className="text-[10px] opacity-70 uppercase tracking-widest">
+													{txStatus === "failed"
+														? "Transaction Timed Out"
+														: "Background Cron Active"}
+												</p>
+											</div>
+
+											{txHash && (
+												<div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+													<p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2">
+														Active Tx Hash
+													</p>
+													<p className="text-blue-400 font-mono text-[10px] break-all">
+														{txHash}
+													</p>
+												</div>
+											)}
+
+											<div className="flex flex-col gap-3">
+												{txStatus === "failed" && (
+													<Button
+														onClick={() => {
+															setIsSubmitted(false);
+															setTxHash(null);
+															setTxStatus("pending");
+														}}
+														className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-gray-200">
+														Retry Execution
+													</Button>
+												)}
+												<p className="text-[9px] text-gray-500 text-center uppercase font-black tracking-widest leading-relaxed">
+													The protocol is indexing your signature.
+													<br />
+													You can safely close this page.
+												</p>
+											</div>
 										</div>
 									) : (
 										<div className="space-y-6">
@@ -391,7 +564,9 @@ export default function PropertyDetail({ property }: { property: Property }) {
 													</div>
 
 													<Button
-														disabled={isPending || isRentedByOthers || isLandlord}
+														disabled={
+															isPending || isRentedByOthers || isLandlord
+														}
 														onClick={handlePayment}
 														className={cn(
 															"w-full h-20 rounded-[2rem] text-xl font-black transition-all",

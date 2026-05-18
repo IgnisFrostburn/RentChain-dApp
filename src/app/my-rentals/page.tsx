@@ -11,6 +11,7 @@ import {
 	LayoutDashboard,
 	Wallet2,
 } from "lucide-react";
+import { properties as mockProperties } from "@/data/mockData";
 import { useWallet } from "@/contexts/WalletContext";
 import { Property } from "@/types/property";
 
@@ -29,29 +30,42 @@ export default function MyRentalsPage() {
 			}
 
 			try {
-				// 1. Fetch all pinned properties and on-chain rented IDs
+				// 1. Aggregate all possible property sources
+				const mintedProperties = JSON.parse(localStorage.getItem('mintedProperties') || '[]');
 				const listingsRes = await fetch("/api/listings");
 				const rentedRes = await fetch("/api/rentals");
 
-				if (listingsRes.ok && rentedRes.ok) {
-					const listings: Property[] = await listingsRes.json();
-					const rentedCIDs: string[] = await rentedRes.json();
+				let apiListings: Property[] = [];
+				let rentedCIDs: string[] = [];
 
-					// 2. Filter for properties rented by US (using our local history as a secondary filter for demo)
-					// In a production app, we'd cross-reference the on-chain tx with our wallet address
-					const myRentedHistory = JSON.parse(
-						localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]",
+				if (listingsRes.ok) apiListings = await listingsRes.json();
+				if (rentedRes.ok) rentedCIDs = await rentedRes.json();
+
+				const allProperties = [...mockProperties, ...mintedProperties, ...apiListings];
+
+				// 2. Filter for properties rented by US but NOT listed by US
+				const myRentedHistory = JSON.parse(
+					localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]",
+				);
+
+				const filtered = allProperties.filter((p) => {
+					const isRentedByMe = (
+						rentedCIDs.includes(p.metadataIpfsHash || "") ||
+						myRentedHistory.includes(p.metadataIpfsHash) ||
+						myRentedHistory.includes(p.id)
 					);
+					
+					const isMine = p.landlordAddress?.toLowerCase() === walletAddress?.toLowerCase();
 
-					const filtered = listings.filter(
-						(p) =>
-							rentedCIDs.includes(p.metadataIpfsHash || "") &&
-							(myRentedHistory.includes(p.metadataIpfsHash) ||
-								myRentedHistory.includes(p.id)),
-					);
+					return isRentedByMe && !isMine;
+				});
 
-					setRentedProperties(filtered);
-				}
+				// Remove duplicates (possible if a property is in both mock and API)
+				const uniqueFiltered = filtered.filter((v, i, a) => 
+					a.findIndex(t => t.id === v.id || (t.metadataIpfsHash && t.metadataIpfsHash === v.metadataIpfsHash)) === i
+				);
+
+				setRentedProperties(uniqueFiltered);
 			} catch (error) {
 				console.error("Error fetching my rentals:", error);
 			} finally {

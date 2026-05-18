@@ -29,7 +29,6 @@ import {
 	CheckCircle2,
 } from "lucide-react";
 import { Property, PropertyMetadata } from "@/types/property";
-import Image from "next/image";
 
 // Dynamically import Map to avoid SSR issues
 const Map = dynamic(() => import("@/components/Map"), {
@@ -309,7 +308,7 @@ export default function ListPropertyPage() {
 												</div>
 											) : (
 												<div className="relative h-64 w-full rounded-2xl overflow-hidden border border-white/10">
-													<Image
+													<img
 														src={imagePreview}
 														alt="Preview"
 														className="w-full h-full object-cover"
