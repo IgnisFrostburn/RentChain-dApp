@@ -11,7 +11,6 @@ import {
 	LayoutDashboard,
 	Wallet2,
 } from "lucide-react";
-import { properties as mockProperties } from "@/data/mockData";
 import { useWallet } from "@/contexts/WalletContext";
 import { Property } from "@/types/property";
 
@@ -41,7 +40,7 @@ export default function MyRentalsPage() {
 				if (listingsRes.ok) apiListings = await listingsRes.json();
 				if (rentedRes.ok) rentedCIDs = await rentedRes.json();
 
-				const allProperties = [...mockProperties, ...mintedProperties, ...apiListings];
+				const allProperties = [...mintedProperties, ...apiListings];
 
 				// 2. Filter for properties rented by US but NOT listed by US
 				const myRentedHistory = JSON.parse(
@@ -54,14 +53,14 @@ export default function MyRentalsPage() {
 						myRentedHistory.includes(p.metadataIpfsHash) ||
 						myRentedHistory.includes(p.id)
 					);
-					
+
 					const isMine = p.landlordAddress?.toLowerCase() === walletAddress?.toLowerCase();
 
 					return isRentedByMe && !isMine;
 				});
 
 				// Remove duplicates (possible if a property is in both mock and API)
-				const uniqueFiltered = filtered.filter((v, i, a) => 
+				const uniqueFiltered = filtered.filter((v, i, a) =>
 					a.findIndex(t => t.id === v.id || (t.metadataIpfsHash && t.metadataIpfsHash === v.metadataIpfsHash)) === i
 				);
 
