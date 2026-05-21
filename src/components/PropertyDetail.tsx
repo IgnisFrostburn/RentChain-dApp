@@ -1,14 +1,13 @@
-"use client";
-import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import Navbar from "./Navbar";
-import { sendLovelace } from "@/utils/transaction";
 import { Button } from "./ui/Button";
 import { Card, CardContent } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 import { useWallet } from "@/contexts/WalletContext";
-import { supabase } from "@/lib/supabase";
+import { useTransactionTracker } from "@/hooks/useTransactionTracker";
+import { useRentProperty } from "@/hooks/useRentProperty";
 import {
 	ChevronLeft,
 	MapPin,
@@ -39,217 +38,32 @@ const Map = dynamic(() => import("@/components/Map"), {
 export default function PropertyDetail({ property }: { property: Property }) {
 	const { wallet, connectedWalletName, walletAddress, setShowWalletModal } =
 		useWallet();
-	const [isPending, setIsPending] = useState(false);
-	const [isSubmitted, setIsSubmitted] = useState(false);
-	const [txStatus, setTxStatus] = useState<string>("pending");
-	const [isConfirmed, setIsConfirmed] = useState(false);
-	const [isRentedByOthers, setIsRentedByOthers] = useState(false);
-	const [txHash, setTxHash] = useState<string | null>(null);
+	const {
+		isSubmitted,
+		setIsSubmitted,
+		txStatus,
+		setTxStatus,
+		isConfirmed,
+		isRentedByOthers,
+		txHash,
+		setTxHash,
+	} = useTransactionTracker(property, walletAddress);
+
+	const { isPending, handlePayment } = useRentProperty({
+		property,
+		wallet,
+		walletAddress,
+		isRentedByOthers,
+		setTxHash,
+		setIsSubmitted,
+		setTxStatus,
+	});
 
 	const isLandlord = !!(
 		walletAddress &&
 		property?.landlordAddress &&
 		walletAddress.toLowerCase() === property?.landlordAddress?.toLowerCase()
 	);
-
-	// Check for existing pending transaction on mount
-	useEffect(() => {
-		if (!property?.id || !walletAddress) return;
-
-		const checkPersistentTx = async () => {
-			const savedTx = localStorage.getItem(
-				`pendingTx_${property.id}_${walletAddress}`,
-			);
-			if (savedTx) {
-				console.log(`[PropertyDetail] Found saved tx hash: ${savedTx}`);
-
-				// 1. Immediately restore the UI to "Syncing" state
-				setTxHash(savedTx);
-				setIsSubmitted(true);
-				setTxStatus("pending");
-
-				// 2. Verify status with Supabase in the background
-				const { data, error } = await supabase
-					.from("transactions")
-					.select("status")
-					.eq("tx_hash", savedTx)
-					.single();
-
-				if (error) {
-					console.warn(
-						"[PropertyDetail] Could not verify status with DB (maybe RLS policy). Keeping pending state.",
-						error.message,
-					);
-				} else if (data) {
-					if (data.status === "confirmed") {
-						setIsConfirmed(true);
-						localStorage.removeItem(
-							`pendingTx_${property.id}_${walletAddress}`,
-						);
-					} else if (data.status === "failed") {
-						setTxStatus("failed");
-					} else {
-						setTxStatus("pending");
-					}
-				}
-			}
-		};
-
-		checkPersistentTx();
-	}, [property, walletAddress]);
-
-	// Real-time listener for transaction status updates from the cron job
-	useEffect(() => {
-		if (!txHash || isConfirmed) return;
-
-		console.log(`[PropertyDetail] Subscribing to updates for tx: ${txHash}`);
-		const channel = supabase
-			.channel(`tx-status-${txHash}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "UPDATE",
-					schema: "public",
-					table: "transactions",
-					filter: `tx_hash=eq.${txHash}`,
-				},
-				(payload) => {
-					console.log(
-						"[PropertyDetail] Status update received:",
-						payload.new.status,
-					);
-					setTxStatus(payload.new.status);
-
-					if (payload.new.status === "confirmed") {
-						setIsConfirmed(true);
-						localStorage.removeItem(
-							`pendingTx_${property.id}_${walletAddress}`,
-						);
-
-						// Local tracking for UI consistency
-						const rentedByWallet = JSON.parse(
-							localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]",
-						);
-						if (
-							!rentedByWallet.includes(property.metadataIpfsHash || property.id)
-						) {
-							rentedByWallet.push(property.metadataIpfsHash || property.id);
-							localStorage.setItem(
-								`rentedProperties_${walletAddress}`,
-								JSON.stringify(rentedByWallet),
-							);
-						}
-					} else if (payload.new.status === "failed") {
-						localStorage.removeItem(
-							`pendingTx_${property.id}_${walletAddress}`,
-						);
-					}
-				},
-			)
-			.subscribe();
-
-		// Fallback Polling (Every 15s) in case Realtime is blocked or fails
-		const interval = setInterval(async () => {
-			if (isConfirmed) return;
-
-			console.log("[PropertyDetail] Fallback status check...");
-			const { data } = await supabase
-				.from("transactions")
-				.select("status")
-				.eq("tx_hash", txHash)
-				.single();
-
-			if (data) {
-				setTxStatus(data.status);
-				if (data.status === "confirmed") {
-					setIsConfirmed(true);
-					localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
-					clearInterval(interval);
-				} else if (data.status === "failed") {
-					localStorage.removeItem(`pendingTx_${property.id}_${walletAddress}`);
-					clearInterval(interval);
-				}
-			}
-		}, 10000);
-
-		return () => {
-			supabase.removeChannel(channel);
-			clearInterval(interval);
-		};
-	}, [txHash, walletAddress, property, isConfirmed]);
-
-	useEffect(() => {
-		const checkRentalStatus = async () => {
-			if (!property?.metadataIpfsHash) return;
-
-			try {
-				// Fetch all rented CIDs from the blockchain via our API
-				const response = await fetch("/api/rentals");
-				if (response.ok) {
-					const rentedCIDs = await response.json();
-					const isRentedOnChain = rentedCIDs.includes(
-						property.metadataIpfsHash,
-					);
-
-					// If it's rented on chain, we need to know if it was by US or OTHERS
-					if (isRentedOnChain) {
-						// For demo purposes, we'll check our own history to see if WE were the ones who rented it
-						// In a real app, we'd scan for transactions specifically from OUR address to this CID
-						const myRentals = JSON.parse(
-							localStorage.getItem(`rentedProperties_${walletAddress}`) || "[]",
-						);
-						if (
-							myRentals.includes(property.id) ||
-							myRentals.includes(property.metadataIpfsHash)
-						) {
-							setIsConfirmed(true);
-						} else {
-							setIsRentedByOthers(true);
-						}
-					}
-				}
-			} catch (error) {
-				console.error("Error checking rental status:", error);
-			}
-		};
-
-		checkRentalStatus();
-	}, [property, walletAddress]);
-
-	const handlePayment = async () => {
-		if (!wallet || !property || !walletAddress) return;
-
-		// Guard: Already rented
-		if (isRentedByOthers || property.status === "Rented") {
-			alert("This property is already rented.");
-			return;
-		}
-
-		try {
-			setIsPending(true);
-			// Pass metadataCID to link this payment to the property on-chain
-			const hash = await sendLovelace(
-				wallet,
-				property.landlordAddress,
-				(property.depositADA * 1000000).toString(),
-				property.metadataIpfsHash,
-			);
-
-			console.log("[PropertyDetail] Transaction submitted:", hash);
-
-			// Persist txHash locally so it survives refresh
-			localStorage.setItem(`pendingTx_${property.id}_${walletAddress}`, hash);
-
-			setTxHash(hash);
-			setIsSubmitted(true);
-			setTxStatus("pending");
-		} catch (error) {
-			console.error("Payment error:", error);
-			alert("Error processing payment. See console for details.");
-		} finally {
-			setIsPending(false);
-		}
-	};
 
 	if (!property) {
 		console.error(
@@ -311,10 +125,11 @@ export default function PropertyDetail({ property }: { property: Property }) {
 						{/* Interactive Visual Element */}
 						<div className="aspect-[21/9] rounded-[3rem] bg-[#0a0a0a] border border-white/5 relative overflow-hidden group shadow-2xl">
 							{property.imageIpfsHash ? (
-								<img
+								<Image
 									src={getIpfsUrl(property.imageIpfsHash)}
 									alt={property.title}
-									className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+									fill
+									className="object-cover group-hover:scale-105 transition-transform duration-1000"
 								/>
 							) : (
 								<>

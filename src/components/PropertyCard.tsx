@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
 	Card,
 	CardContent,
@@ -45,10 +46,11 @@ export default function PropertyCard({
 		<Card className="group overflow-hidden border-white/5 bg-white/5 backdrop-blur-xl hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.2)] transition-all duration-500 rounded-[2rem]">
 			<div className="relative h-56 w-full bg-[#0a0a0a] overflow-hidden">
 				{imageIpfsHash ? (
-					<img
+					<Image
 						src={getIpfsUrl(imageIpfsHash)}
 						alt={title}
-						className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+						fill
+						className="object-cover group-hover:scale-110 transition-transform duration-700"
 					/>
 				) : (
 					<>

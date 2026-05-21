@@ -2,13 +2,23 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
 	images: {
+		unoptimized: true, // Recommended for IPFS/decentralized apps
 		remotePatterns: [
 			{
 				protocol: "https",
 				hostname: "ipfs.io",
-				port: "",
 				pathname: "/ipfs/**",
 			},
+			{
+				protocol: "https",
+				hostname: "gateway.pinata.cloud",
+				pathname: "/ipfs/**",
+			},
+			{
+				protocol: "https",
+				hostname: "nftstorage.link",
+				pathname: "/ipfs/**",
+			}
 		],
 	},
 	webpack: (config) => {
@@ -16,6 +26,7 @@ const nextConfig: NextConfig = {
 			...config.experiments,
 			asyncWebAssembly: true,
 			layers: true,
+			topLevelAwait: true,
 		};
 
 		config.module.rules.push({

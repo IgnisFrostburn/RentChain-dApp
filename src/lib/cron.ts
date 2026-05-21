@@ -1,5 +1,5 @@
-import cron from 'node-cron';
-import { supabase } from './supabase';
+import cron from "node-cron";
+import { supabase } from "./supabase";
 
 const apiKey = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
 
@@ -93,7 +93,10 @@ export function startTransactionCheckCron() {
 						);
 					}
 				} catch (err) {
-					console.error(`[Cron] Error checking transaction ${tx.tx_hash}:`, err);
+					console.error(
+						`[Cron] Error checking transaction ${tx.tx_hash}:`,
+						err,
+					);
 				}
 			}
 		} catch (error) {

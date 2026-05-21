@@ -5,10 +5,8 @@ export async function GET() {
 	try {
 		const projectId = process.env.NEXT_PUBLIC_BLOCKFROST_PROJECT_ID;
 		if (!projectId) {
-			return NextResponse.json(
-				{ error: "Blockfrost Cardano Project ID not configured" },
-				{ status: 500 },
-			);
+			console.warn("Blockfrost Cardano Project ID not configured. Returning empty rentals array.");
+			return NextResponse.json([]);
 		}
 
 		// We use metadata label 1618 for rental confirmations
